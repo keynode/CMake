@@ -430,6 +430,8 @@ if (WIN32)
       cmGlobalVisualStudio14Generator.cxx
       cmGlobalVisualStudioGenerator.cxx
       cmGlobalVisualStudioGenerator.h
+      Crytek/cmGlobalVisualStudio11_Durango_Generator.h
+      Crytek/cmGlobalVisualStudio11_Durango_Generator.cxx
       cmIDEFlagTable.h
       cmIDEOptions.cxx
       cmIDEOptions.h
