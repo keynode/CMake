@@ -359,6 +359,26 @@ void cmVisualStudio10TargetGenerator::Generate()
     (*this->BuildFileStream) << cmVS10EscapeXML(targetFrameworkVersion)
                              << "</TargetFrameworkVersion>\n";
     }
+	//////////////////////////////////////////////////////////////////////////
+	//Timur
+	//////////////////////////////////////////////////////////////////////////
+	cmPropertyMap const& props = this->Target->GetProperties();
+	for(cmPropertyMap::const_iterator i = props.begin(); i != props.end(); ++i)
+	{
+		if(i->first.find("VS_GLOBAL_PROPERTY_GROUP_") == 0)
+		{
+			std::string name = i->first.substr(25);
+			if(name != "")
+			{
+				this->WriteString( "", 2);
+				(*this->BuildFileStream) << "<" << name << ">" 
+					<< i->second.GetValue() 
+					<< "</" << name.c_str() << ">\n";
+			}
+		}
+	}
+	//////////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////////
   this->WriteString("</PropertyGroup>\n", 1);
   this->WriteString("<Import Project="
                     "\"$(VCTargetsPath)\\Microsoft.Cpp.Default.props\" />\n",
@@ -378,7 +398,7 @@ void cmVisualStudio10TargetGenerator::Generate()
                     " Condition=\"exists('" VS10_USER_PROPS "')\""
                     " Label=\"LocalAppDataPlatform\" />\n", 2);
   this->WriteString("</ImportGroup>\n", 1);
-  this->WriteString("<PropertyGroup Label=\"UserMacros\" />\n", 1);
+	this->WriteUserMacros();
   this->WritePathAndIncrementalLinkOptions();
   this->WriteItemDefinitionGroups();
   this->WriteCustomCommands();
@@ -582,6 +602,24 @@ void cmVisualStudio10TargetGenerator
   std::string mfcLine = "<UseOfMfc>";
   mfcLine += useOfMfcValue + "</UseOfMfc>\n";
   this->WriteString(mfcLine.c_str(), 2);
+		//////////////////////////////////////////////////////////////////////////
+		//Timur
+		//////////////////////////////////////////////////////////////////////////
+		cmPropertyMap const& props = this->Target->GetProperties();
+		for(cmPropertyMap::const_iterator i = props.begin(); i != props.end(); ++i)
+		{
+			if(i->first.find("VS_PROJECT_CONFIG_PROPERTY_GROUP_") == 0)
+			{
+				std::string name = i->first.substr(33);
+				if(name != "")
+				{
+					this->WriteString( "", 2);
+					(*this->BuildFileStream) << "<" << name << ">" 
+						<< i->second.GetValue() 
+						<< "</" << name.c_str() << ">\n";
+				}
+			}
+		}
 
   if((this->Target->GetType() <= cmTarget::OBJECT_LIBRARY &&
       this->ClOptions[config]->UsingUnicode()) ||
@@ -1294,7 +1332,7 @@ bool cmVisualStudio10TargetGenerator::OutputSourceSpecificFlags(
       cmVisualStudioGeneratorOptions
         clOptions(this->LocalGenerator,
                   cmVisualStudioGeneratorOptions::Compiler,
-                  this->GetClFlagTable(), 0, this);
+                  this->GetClFlagTable(),  this->LocalGenerator->GetExtraFlagTable(), this);
       if(compileAs)
         {
         clOptions.AddFlag("CompileAs", compileAs);
@@ -1308,6 +1346,14 @@ bool cmVisualStudio10TargetGenerator::OutputSourceSpecificFlags(
                                               "      ", "\n", lang);
       }
     }
+		//////////////////////////////////////////////////////////////////////////
+		//Timur
+		//////////////////////////////////////////////////////////////////////////
+		// For C files disable /ZW switch
+		if(strcmp(lang, "C") == 0)
+		{
+			this->WriteString("<CompileAsWinRT>false</CompileAsWinRT>\n", 3);
+		}
   return hasFlags;
 }
 
@@ -1320,7 +1366,7 @@ void cmVisualStudio10TargetGenerator::WritePathAndIncrementalLinkOptions()
     return;
     }
 
-  this->WriteString("<PropertyGroup>\n", 2);
+  this->WriteString("<PropertyGroup>\n", 1);
   this->WriteString("<_ProjectFileVersion>10.0.20506.1"
                     "</_ProjectFileVersion>\n", 3);
   std::vector<std::string> *configs =
@@ -1343,6 +1389,18 @@ void cmVisualStudio10TargetGenerator::WritePathAndIncrementalLinkOptions()
       intermediateDir += "/";
       intermediateDir += *config;
       intermediateDir += "/";
+			
+			//////////////////////////////////////////////////////////////////////////
+			//Timur
+			//////////////////////////////////////////////////////////////////////////
+			std::string vsIntDirProp = std::string("VS_INTERMEDIATE_DIRECTORY_") + cmSystemTools::UpperCase(*config); // VS_INTERMEDIATE_DIRECTORY_DEBUG,VS_INTERMEDIATE_DIRECTORY_RELEASE
+			const char* vsIntermediateDir = this->Target->GetProperty( vsIntDirProp.c_str() );
+			if (vsIntermediateDir)
+			{
+				intermediateDir = vsIntermediateDir;
+			}
+			//////////////////////////////////////////////////////////////////////////
+
       std::string outDir;
       std::string targetNameFull;
       if(ttype == cmTarget::OBJECT_LIBRARY)
@@ -1384,9 +1442,31 @@ void cmVisualStudio10TargetGenerator::WritePathAndIncrementalLinkOptions()
       *this->BuildFileStream << cmVS10EscapeXML(ext) << "</TargetExt>\n";
 
       this->OutputLinkIncremental(*config);
+			
+			//////////////////////////////////////////////////////////////////////////
+			//Timur
+			//////////////////////////////////////////////////////////////////////////
+			cmPropertyMap const& props = this->Target->GetProperties();
+			for(cmPropertyMap::const_iterator i = props.begin(); i != props.end(); ++i)
+			{
+				if(i->first.find("VS_CONFIG_PROPERTY_GROUP_") == 0)
+				{
+					std::string name = i->first.substr(25);
+					if(name != "")
+					{
+						this->WriteString( "", 3);
+						(*this->BuildFileStream) << "<" << name << ">" 
+							<< i->second.GetValue() 
+							<< "</" << name.c_str() << ">\n";
+					}
+				}
+			}
+			//////////////////////////////////////////////////////////////////////////
+			//////////////////////////////////////////////////////////////////////////
+
       }
     }
-  this->WriteString("</PropertyGroup>\n", 2);
+  this->WriteString("</PropertyGroup>\n", 1);
 }
 
 
@@ -1460,7 +1540,7 @@ bool cmVisualStudio10TargetGenerator::ComputeClOptions(
 
   cmsys::auto_ptr<Options> pOptions(
     new Options(this->LocalGenerator, Options::Compiler,
-                this->GetClFlagTable()));
+                this->GetClFlagTable(),this->LocalGenerator->GetExtraFlagTable()));
   Options& clOptions = *pOptions;
 
   std::string flags;
@@ -1568,6 +1648,18 @@ void cmVisualStudio10TargetGenerator::WriteClOptions(
                              << "</ProgramDataBaseFileName>\n";
       }
     }
+
+	//////////////////////////////////////////////////////////////////////////
+	//Timur
+	//////////////////////////////////////////////////////////////////////////
+	const char* vsCompileAsWinRT = this->Target->GetProperty("VS_COMPILE_AS_WIN_RT");
+	if (vsCompileAsWinRT)
+	{
+		this->WriteString("<CompileAsWinRT>", 3);
+		this->WriteString(vsCompileAsWinRT,0);
+		this->WriteString("</CompileAsWinRT>\n",0);
+	}
+	//////////////////////////////////////////////////////////////////////////
 
   this->WriteString("</ClCompile>\n", 2);
 }
@@ -1991,6 +2083,31 @@ void cmVisualStudio10TargetGenerator::WriteItemDefinitionGroups()
     this->WriteString("</ItemDefinitionGroup>\n", 1);
     }
 }
+
+//////////////////////////////////////////////////////////////////////////
+// Timur
+//////////////////////////////////////////////////////////////////////////
+void cmVisualStudio10TargetGenerator::WriteUserMacros()
+{
+	this->WriteString("<PropertyGroup Label=\"UserMacros\" >\n", 1);
+	cmPropertyMap const& props = this->Target->GetProperties();
+	for(cmPropertyMap::const_iterator i = props.begin(); i != props.end(); ++i)
+	{
+		if(i->first.find("VS_USER_MACRO_") == 0)
+		{
+			std::string name = i->first.substr(14);
+			if(name != "")
+			{
+				this->WriteString( "", 2);
+				(*this->BuildFileStream) << "<" << name << ">" 
+					<< i->second.GetValue() 
+					<< "</" << name.c_str() << ">\n";
+			}
+		}
+	}
+	this->WriteString("</PropertyGroup>\n", 1);
+}
+//////////////////////////////////////////////////////////////////////////
 
 void
 cmVisualStudio10TargetGenerator::WriteEvents(std::string const& configName)

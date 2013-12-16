@@ -62,7 +62,8 @@
 #    include "cmGlobalBorlandMakefileGenerator.h"
 #    include "cmGlobalNMakeMakefileGenerator.h"
 #    include "cmGlobalJOMMakefileGenerator.h"
-#    include "Crytek/cmGlobalVisualStudio11_Durango_Generator.h"
+#    include "cmGlobalVisualStudio11_Durango_Generator.h"
+#    include "cmGlobalVisualStudio11_Orbis_Generator.h"
 #    define CMAKE_HAVE_VS_GENERATORS
 #  endif
 #  include "cmGlobalMSYSMakefileGenerator.h"
@@ -1785,6 +1786,8 @@ void cmake::AddDefaultGenerators()
     cmGlobalVisualStudio14Generator::NewFactory());
   this->Generators.push_back(
     cmGlobalVisualStudio11_Durango_Generator::NewFactory());
+	this->Generators.push_back(
+		cmGlobalVisualStudio11_Orbis_Generator::NewFactory());
 	this->Generators.push_back(
     cmGlobalVisualStudio71Generator::NewFactory());
   this->Generators.push_back(

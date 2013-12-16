@@ -34,6 +34,8 @@ public:
   /** TODO: VS 11 user macro support. */
   virtual std::string GetUserMacrosDirectory() { return ""; }
 protected:
+	virtual void AddPlatformDefinitions(cmMakefile* mf);
+
   virtual const char* GetIDEVersion() { return "11.0"; }
   bool UseFolderProperty();
 
