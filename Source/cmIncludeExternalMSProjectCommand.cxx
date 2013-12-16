@@ -23,7 +23,7 @@ bool cmIncludeExternalMSProjectCommand
   }
 // only compile this for win32 to avoid coverage errors
 #ifdef _WIN32
-  if(this->Makefile->GetDefinition("WIN32"))
+  if(this->Makefile->GetDefinition("MSVC"))
     {
     enum Doing { DoingNone, DoingType, DoingGuid, DoingPlatform };
 

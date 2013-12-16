@@ -67,6 +67,7 @@ private:
   void WriteWinRTReferences();
   void WritePathAndIncrementalLinkOptions();
   void WriteItemDefinitionGroups();
+	void WriteUserMacros();
 
   bool ComputeClOptions();
   bool ComputeClOptions(std::string const& configName);

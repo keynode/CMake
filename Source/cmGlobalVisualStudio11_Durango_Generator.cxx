@@ -13,7 +13,7 @@
 #include "cmLocalVisualStudio10Generator.h"
 #include "cmMakefile.h"
 
-static const char vs11_durango_generatorName[] = "Visual Studio 11 Durango";
+static const char vs11_durango_generatorName[] = "Visual Studio 11 2012 Durango";
 
 class cmGlobalVisualStudio11_Durango_Generator::Factory
   : public cmGlobalGeneratorFactory
@@ -21,7 +21,14 @@ class cmGlobalVisualStudio11_Durango_Generator::Factory
 public:
   virtual cmGlobalGenerator* CreateGlobalGenerator(const char* name) const
     {
-			return new cmGlobalVisualStudio11_Durango_Generator(name, "Durango", NULL);
+			if (0 == strcmp(name,vs11_durango_generatorName))
+			{
+				return new cmGlobalVisualStudio11_Durango_Generator(name, "Durango", NULL);
+			}
+			else
+			{
+				return 0;
+			}
     }
 
   virtual void GetDocumentation(cmDocumentationEntry& entry) const
@@ -92,4 +99,11 @@ bool cmGlobalVisualStudio11_Durango_Generator::UseFolderProperty()
   // grand-parent class's implementation. Folders are not supported by the
   // Express editions in VS10 and earlier, but they are in VS11 Express.
   return cmGlobalVisualStudio8Generator::UseFolderProperty();
+}
+
+//////////////////////////////////////////////////////////////////////////
+void cmGlobalVisualStudio11_Durango_Generator::AddPlatformDefinitions( cmMakefile* mf )
+{
+	//mf->AddDefinition( "CMAKE_TOOLCHAIN_FILE","cmake/toolchain-durango.cmake" );
+	cmGlobalVisualStudio10Generator::AddPlatformDefinitions(mf);
 }
