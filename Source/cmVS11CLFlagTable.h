@@ -163,6 +163,7 @@ static cmVS7FlagTable cmVS11CLFlagTable[] =
 
 
   //Bool Properties
+	{"CompileAsWinRT", "ZW-", "", "false", 0},
   {"CompileAsWinRT", "ZW", "", "true", 0},
   {"WinRTNoStdLib", "ZW:nostdlib", "", "true", 0},
   {"SuppressStartupBanner", "nologo-", "", "false", 0},
