@@ -1261,14 +1261,6 @@ bool cmVisualStudio10TargetGenerator::OutputSourceSpecificFlags(
                                               "      ", "\n", lang);
       }
     }
-		//////////////////////////////////////////////////////////////////////////
-		//Timur
-		//////////////////////////////////////////////////////////////////////////
-		// For C files disable /ZW switch
-		if(strcmp(lang, "C") == 0)
-		{
-			this->WriteString("<CompileAsWinRT>false</CompileAsWinRT>\n", 3);
-		}
   return hasFlags;
 }
 
@@ -1554,18 +1546,6 @@ void cmVisualStudio10TargetGenerator::WriteClOptions(
     *this->BuildFileStream << cmVS10EscapeXML(pdb)
                            << "</ProgramDataBaseFileName>\n";
     }
-
-	//////////////////////////////////////////////////////////////////////////
-	//Timur
-	//////////////////////////////////////////////////////////////////////////
-	const char* vsCompileAsWinRT = this->Target->GetProperty("VS_COMPILE_AS_WIN_RT");
-	if (vsCompileAsWinRT)
-	{
-		this->WriteString("<CompileAsWinRT>", 3);
-		this->WriteString(vsCompileAsWinRT,0);
-		this->WriteString("</CompileAsWinRT>\n",0);
-	}
-	//////////////////////////////////////////////////////////////////////////
 
   this->WriteString("</ClCompile>\n", 2);
 }
