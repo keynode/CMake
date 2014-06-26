@@ -37,9 +37,9 @@ class cmGlobalVisualStudio11_Orbis_Generator::Factory
   : public cmGlobalGeneratorFactory
 {
 public:
-  virtual cmGlobalGenerator* CreateGlobalGenerator(const char* name) const
+  virtual cmGlobalGenerator* CreateGlobalGenerator(const std::string& name) const
     {
-			if (0 == strcmp(name,vs11_Orbis_generatorName))
+			if (0 == strcmp(name.c_str(),vs11_Orbis_generatorName))
 			{
 				return new cmGlobalVisualStudio11_Orbis_Generator(name, "ORBIS", NULL);
 			}
@@ -69,14 +69,14 @@ cmGlobalGeneratorFactory* cmGlobalVisualStudio11_Orbis_Generator::NewFactory()
 
 //----------------------------------------------------------------------------
 cmGlobalVisualStudio11_Orbis_Generator::cmGlobalVisualStudio11_Orbis_Generator(
-  const char* name, const char* platformName,
-  const char* additionalPlatformDefinition)
+  const std::string& name, const std::string& platformName,
+  const std::string& additionalPlatformDefinition)
   : cmGlobalVisualStudio10Generator(name, platformName,
                                    additionalPlatformDefinition)
 {
   std::string vc11Express;
   this->ExpressEdition = false;
-  this->PlatformToolset = "clang";
+  this->DefaultPlatformToolset = "clang";
 }
 
 //----------------------------------------------------------------------------
