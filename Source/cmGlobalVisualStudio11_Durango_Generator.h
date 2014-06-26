@@ -20,8 +20,7 @@ class cmGlobalVisualStudio11_Durango_Generator:
   public cmGlobalVisualStudio10Generator
 {
 public:
-  cmGlobalVisualStudio11_Durango_Generator(const char* name,
-    const char* platformName, const char* additionalPlatformDefinition);
+  cmGlobalVisualStudio11_Durango_Generator( const std::string& name, const std::string& platformName,const std::string& additionalPlatformDefinition);
   static cmGlobalGeneratorFactory* NewFactory();
 
   virtual bool MatchesGeneratorName(const char* name) const;

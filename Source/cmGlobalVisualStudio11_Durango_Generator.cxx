@@ -19,9 +19,9 @@ class cmGlobalVisualStudio11_Durango_Generator::Factory
   : public cmGlobalGeneratorFactory
 {
 public:
-  virtual cmGlobalGenerator* CreateGlobalGenerator(const char* name) const
+  virtual cmGlobalGenerator* CreateGlobalGenerator(const std::string& name) const
     {
-			if (0 == strcmp(name,vs11_durango_generatorName))
+			if (0 == strcmp(name.c_str(),vs11_durango_generatorName))
 			{
 				return new cmGlobalVisualStudio11_Durango_Generator(name, "Durango", NULL);
 			}
@@ -51,14 +51,14 @@ cmGlobalGeneratorFactory* cmGlobalVisualStudio11_Durango_Generator::NewFactory()
 
 //----------------------------------------------------------------------------
 cmGlobalVisualStudio11_Durango_Generator::cmGlobalVisualStudio11_Durango_Generator(
-  const char* name, const char* platformName,
-  const char* additionalPlatformDefinition)
+  const std::string& name, const std::string& platformName,
+  const std::string& additionalPlatformDefinition)
   : cmGlobalVisualStudio10Generator(name, platformName,
                                    additionalPlatformDefinition)
 {
   std::string vc11Express;
   this->ExpressEdition = false;
-  this->PlatformToolset = "v110";
+  this->DefaultPlatformToolset = "v110";
 }
 
 //----------------------------------------------------------------------------
