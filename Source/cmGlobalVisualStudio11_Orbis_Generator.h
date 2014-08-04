@@ -12,36 +12,44 @@
 #ifndef cmGlobalVisualStudio11_Orbis_Generator_h
 #define cmGlobalVisualStudio11_Orbis_Generator_h
 
-#include "cmGlobalVisualStudio10Generator.h"
+#include "cmGlobalVisualStudio12Generator.h"
 
-
-/** \class cmGlobalVisualStudio11_Orbis_Generator  */
-class cmGlobalVisualStudio11_Orbis_Generator:
-  public cmGlobalVisualStudio10Generator
+class cmGlobalVisualStudio11_Orbis_Generator: public cmGlobalVisualStudio11Generator
 {
 public:
-  cmGlobalVisualStudio11_Orbis_Generator(const std::string& name, const std::string& platformName,const std::string& additionalPlatformDefinition);
+  cmGlobalVisualStudio11_Orbis_Generator(const std::string& name, const std::string& platformName, const std::string& additionalPlatformDefinition);
   static cmGlobalGeneratorFactory* NewFactory();
 
-  virtual bool MatchesGeneratorName(const char* name) const;
-
-  virtual void WriteSLNHeader(std::ostream& fout);
+  virtual bool MatchesGeneratorName(const std::string& name) const;
 
   ///! create the correct local generator
   virtual cmLocalGenerator *CreateLocalGenerator();
 
-	virtual bool NeedLinkLibraryDependencies(cmTarget& target);
-
-  /** TODO: VS 11 user macro support. */
-  virtual std::string GetUserMacrosDirectory() { return ""; }
-protected:
-	virtual void AddPlatformDefinitions(cmMakefile* mf);
-
-  virtual const char* GetIDEVersion() { return "11.0"; }
-  bool UseFolderProperty();
+  virtual bool NeedLinkLibraryDependencies(cmTarget& target);
 
 private:
   class Factory;
   friend class Factory;
 };
+
+/*
+class cmGlobalVisualStudio12_Orbis_Generator : public cmGlobalVisualStudio12Generator
+{
+public:
+	cmGlobalVisualStudio12_Orbis_Generator(const std::string& name, const std::string& platformName, const std::string& additionalPlatformDefinition);
+	static cmGlobalGeneratorFactory* NewFactory();
+
+	virtual bool MatchesGeneratorName(const std::string& name) const;
+
+	///! create the correct local generator
+	virtual cmLocalGenerator *CreateLocalGenerator();
+
+	virtual bool NeedLinkLibraryDependencies(cmTarget& target);
+
+private:
+	class Factory;
+	friend class Factory;
+};
+*/
+
 #endif

@@ -12,31 +12,15 @@
 #ifndef cmGlobalVisualStudio11_Durango_Generator_h
 #define cmGlobalVisualStudio11_Durango_Generator_h
 
-#include "cmGlobalVisualStudio10Generator.h"
+#include "cmGlobalVisualStudio11Generator.h"
 
-
-/** \class cmGlobalVisualStudio11_Durango_Generator  */
-class cmGlobalVisualStudio11_Durango_Generator:
-  public cmGlobalVisualStudio10Generator
+class cmGlobalVisualStudio11_Durango_Generator :  public cmGlobalVisualStudio11Generator
 {
 public:
-  cmGlobalVisualStudio11_Durango_Generator( const std::string& name, const std::string& platformName,const std::string& additionalPlatformDefinition);
+  cmGlobalVisualStudio11_Durango_Generator(const std::string& name, const std::string& platformName, const std::string& additionalPlatformDefinition) : cmGlobalVisualStudio11Generator(name, platformName, additionalPlatformDefinition) {}
   static cmGlobalGeneratorFactory* NewFactory();
 
-  virtual bool MatchesGeneratorName(const char* name) const;
-
-  virtual void WriteSLNHeader(std::ostream& fout);
-
-  ///! create the correct local generator
-  virtual cmLocalGenerator *CreateLocalGenerator();
-
-  /** TODO: VS 11 user macro support. */
-  virtual std::string GetUserMacrosDirectory() { return ""; }
-protected:
-	virtual void AddPlatformDefinitions(cmMakefile* mf);
-
-  virtual const char* GetIDEVersion() { return "11.0"; }
-  bool UseFolderProperty();
+  virtual bool MatchesGeneratorName(const std::string& name) const;
 
 private:
   class Factory;

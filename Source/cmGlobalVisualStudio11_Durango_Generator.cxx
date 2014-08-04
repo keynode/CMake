@@ -13,7 +13,7 @@
 #include "cmLocalVisualStudio10Generator.h"
 #include "cmMakefile.h"
 
-static const char vs11_durango_generatorName[] = "Visual Studio 11 2012 Durango";
+static const char durango_generatorName[] = "Visual Studio 11 2012 Durango";
 
 class cmGlobalVisualStudio11_Durango_Generator::Factory
   : public cmGlobalGeneratorFactory
@@ -21,9 +21,9 @@ class cmGlobalVisualStudio11_Durango_Generator::Factory
 public:
   virtual cmGlobalGenerator* CreateGlobalGenerator(const std::string& name) const
     {
-			if (0 == strcmp(name.c_str(),vs11_durango_generatorName))
+			if (0 == strcmp(name.c_str(),durango_generatorName))
 			{
-				return new cmGlobalVisualStudio11_Durango_Generator(name, "Durango", NULL);
+				return new cmGlobalVisualStudio11_Durango_Generator(name, "Durango", "");
 			}
 			else
 			{
@@ -33,13 +33,13 @@ public:
 
   virtual void GetDocumentation(cmDocumentationEntry& entry) const
     {
-    entry.Name = vs11_durango_generatorName;
-    entry.Brief = "Generates Visual Studio 11 (2012) Durango (Xbox One) project files.";
+    entry.Name = durango_generatorName;
+	entry.Brief = std::string("Generates project files for: ") + durango_generatorName;
     }
 
   virtual void GetGenerators(std::vector<std::string>& names) const
     {
-    names.push_back(vs11_durango_generatorName);
+    names.push_back(durango_generatorName);
     }
 };
 
@@ -50,60 +50,8 @@ cmGlobalGeneratorFactory* cmGlobalVisualStudio11_Durango_Generator::NewFactory()
 }
 
 //----------------------------------------------------------------------------
-cmGlobalVisualStudio11_Durango_Generator::cmGlobalVisualStudio11_Durango_Generator(
-  const std::string& name, const std::string& platformName,
-  const std::string& additionalPlatformDefinition)
-  : cmGlobalVisualStudio10Generator(name, platformName,
-                                   additionalPlatformDefinition)
-{
-  std::string vc11Express;
-  this->ExpressEdition = false;
-  this->DefaultPlatformToolset = "v110";
-}
-
-//----------------------------------------------------------------------------
 bool
-cmGlobalVisualStudio11_Durango_Generator::MatchesGeneratorName(const char* name) const
+cmGlobalVisualStudio11_Durango_Generator::MatchesGeneratorName(const std::string& name) const
 {
-  return 0 == strcmp(vs11_durango_generatorName,name);
-}
-
-//----------------------------------------------------------------------------
-void cmGlobalVisualStudio11_Durango_Generator::WriteSLNHeader(std::ostream& fout)
-{
-  fout << "Microsoft Visual Studio Solution File, Format Version 12.00\n";
-  if (this->ExpressEdition)
-    {
-    fout << "# Visual Studio Express 2012 for Windows Desktop\n";
-    }
-  else
-    {
-    fout << "# Visual Studio 2012\n";
-    }
-}
-
-//----------------------------------------------------------------------------
-cmLocalGenerator *cmGlobalVisualStudio11_Durango_Generator::CreateLocalGenerator()
-{
-  cmLocalVisualStudio10Generator* lg =
-    new cmLocalVisualStudio10Generator(cmLocalVisualStudioGenerator::VS11);
-  lg->SetPlatformName(this->GetPlatformName());
-  lg->SetGlobalGenerator(this);
-  return lg;
-}
-
-//----------------------------------------------------------------------------
-bool cmGlobalVisualStudio11_Durango_Generator::UseFolderProperty()
-{
-  // Intentionally skip over the parent class implementation and call the
-  // grand-parent class's implementation. Folders are not supported by the
-  // Express editions in VS10 and earlier, but they are in VS11 Express.
-  return cmGlobalVisualStudio8Generator::UseFolderProperty();
-}
-
-//////////////////////////////////////////////////////////////////////////
-void cmGlobalVisualStudio11_Durango_Generator::AddPlatformDefinitions( cmMakefile* mf )
-{
-	//mf->AddDefinition( "CMAKE_TOOLCHAIN_FILE","cmake/toolchain-durango.cmake" );
-	cmGlobalVisualStudio10Generator::AddPlatformDefinitions(mf);
+  return 0 == strcmp(durango_generatorName,name.c_str());
 }

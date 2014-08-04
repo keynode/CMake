@@ -14,6 +14,7 @@
 #include "cmMakefile.h"
 
 static const char vs11_Orbis_generatorName[] = "Visual Studio 11 2012 ORBIS";
+static const char vs12_Orbis_generatorName[] = "Visual Studio 12 2013 ORBIS";
 
 //----------------------------------------------------------------------------
 static cmVS7FlagTable cm_CLang_ExtraFlagTable[] =
@@ -41,7 +42,7 @@ public:
     {
 			if (0 == strcmp(name.c_str(),vs11_Orbis_generatorName))
 			{
-				return new cmGlobalVisualStudio11_Orbis_Generator(name, "ORBIS", NULL);
+				return new cmGlobalVisualStudio11_Orbis_Generator(name, "ORBIS", "");
 			}
 			else
 			{
@@ -52,7 +53,7 @@ public:
   virtual void GetDocumentation(cmDocumentationEntry& entry) const
     {
     entry.Name = vs11_Orbis_generatorName;
-    entry.Brief = "Generates Visual Studio 11 (2012) ORBIS (PS4) project files.";
+	entry.Brief = std::string("Generates project files for: ") + vs11_Orbis_generatorName;
     }
 
   virtual void GetGenerators(std::vector<std::string>& names) const
@@ -71,60 +72,28 @@ cmGlobalGeneratorFactory* cmGlobalVisualStudio11_Orbis_Generator::NewFactory()
 cmGlobalVisualStudio11_Orbis_Generator::cmGlobalVisualStudio11_Orbis_Generator(
   const std::string& name, const std::string& platformName,
   const std::string& additionalPlatformDefinition)
-  : cmGlobalVisualStudio10Generator(name, platformName,
+  : cmGlobalVisualStudio11Generator(name, platformName,
                                    additionalPlatformDefinition)
 {
-  std::string vc11Express;
-  this->ExpressEdition = false;
   this->DefaultPlatformToolset = "clang";
 }
 
 //----------------------------------------------------------------------------
 bool
-cmGlobalVisualStudio11_Orbis_Generator::MatchesGeneratorName(const char* name) const
+cmGlobalVisualStudio11_Orbis_Generator::MatchesGeneratorName(const std::string& name) const
 {
-  return 0 == strcmp(vs11_Orbis_generatorName,name);
-}
-
-//----------------------------------------------------------------------------
-void cmGlobalVisualStudio11_Orbis_Generator::WriteSLNHeader(std::ostream& fout)
-{
-  fout << "Microsoft Visual Studio Solution File, Format Version 12.00\n";
-  if (this->ExpressEdition)
-    {
-    fout << "# Visual Studio Express 2012 for Windows Desktop\n";
-    }
-  else
-    {
-    fout << "# Visual Studio 2012\n";
-    }
+  return 0 == strcmp(vs11_Orbis_generatorName,name.c_str());
 }
 
 //----------------------------------------------------------------------------
 cmLocalGenerator *cmGlobalVisualStudio11_Orbis_Generator::CreateLocalGenerator()
 {
   cmLocalVisualStudio10Generator* lg =
-    new cmLocalVisualStudio10Generator(cmLocalVisualStudioGenerator::VS11);
+		new cmLocalVisualStudio10Generator(cmLocalVisualStudioGenerator::VS12);
   lg->SetPlatformName(this->GetPlatformName());
-	lg->SetExtraFlagTable(cm_CLang_ExtraFlagTable);
+  lg->SetExtraFlagTable(cm_CLang_ExtraFlagTable);
   lg->SetGlobalGenerator(this);
   return lg;
-}
-
-//----------------------------------------------------------------------------
-bool cmGlobalVisualStudio11_Orbis_Generator::UseFolderProperty()
-{
-  // Intentionally skip over the parent class implementation and call the
-  // grand-parent class's implementation. Folders are not supported by the
-  // Express editions in VS10 and earlier, but they are in VS11 Express.
-  return cmGlobalVisualStudio8Generator::UseFolderProperty();
-}
-
-//////////////////////////////////////////////////////////////////////////
-void cmGlobalVisualStudio11_Orbis_Generator::AddPlatformDefinitions( cmMakefile* mf )
-{
-	//mf->AddDefinition( "CMAKE_TOOLCHAIN_FILE","cmake/toolchain-orbis.cmake" );
-	cmGlobalVisualStudio10Generator::AddPlatformDefinitions(mf);
 }
 
 bool cmGlobalVisualStudio11_Orbis_Generator::NeedLinkLibraryDependencies( cmTarget& target )
