@@ -383,7 +383,7 @@ void cmVisualStudio10TargetGenerator::Generate()
                     " Condition=\"exists('" VS10_USER_PROPS "')\""
                     " Label=\"LocalAppDataPlatform\" />\n", 2);
   this->WriteString("</ImportGroup>\n", 1);
-  this->WriteString("<PropertyGroup Label=\"UserMacros\" />\n", 1);
+  this->WriteUserMacros();
   this->WritePathAndIncrementalLinkOptions();
   this->WriteItemDefinitionGroups();
   this->WriteCustomCommands();
@@ -2079,6 +2079,27 @@ void cmVisualStudio10TargetGenerator::WriteItemDefinitionGroups()
     this->WriteLibOptions(*i);
     this->WriteString("</ItemDefinitionGroup>\n", 1);
     }
+}
+
+void cmVisualStudio10TargetGenerator::WriteUserMacros()
+{
+  this->WriteString("<PropertyGroup Label=\"UserMacros\" >\n", 1);
+  cmPropertyMap const& props = this->Target->GetProperties();
+  for(cmPropertyMap::const_iterator i = props.begin(); i != props.end(); ++i)
+  {
+    if(i->first.find("VS_USER_MACRO_") == 0)
+    {
+      std::string macroName = i->first.substr(strlen("VS_USER_MACRO_"));
+      if(macroName != "")
+      {
+        this->WriteString( "", 2);
+        (*this->BuildFileStream) << "<" << macroName << ">" 
+          << i->second.GetValue() 
+          << "</" << macroName.c_str() << ">\n";
+      }
+    }
+  }
+  this->WriteString("</PropertyGroup>\n", 1);
 }
 
 void
