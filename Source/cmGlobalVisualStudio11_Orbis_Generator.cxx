@@ -42,7 +42,7 @@ public:
     {
 			if (0 == strcmp(name.c_str(),vs11_Orbis_generatorName))
 			{
-				return new cmGlobalVisualStudio11_Orbis_Generator(name, "ORBIS", "");
+				return new cmGlobalVisualStudio11_Orbis_Generator(name, "ORBIS");
 			}
 			else
 			{
@@ -70,10 +70,8 @@ cmGlobalGeneratorFactory* cmGlobalVisualStudio11_Orbis_Generator::NewFactory()
 
 //----------------------------------------------------------------------------
 cmGlobalVisualStudio11_Orbis_Generator::cmGlobalVisualStudio11_Orbis_Generator(
-  const std::string& name, const std::string& platformName,
-  const std::string& additionalPlatformDefinition)
-  : cmGlobalVisualStudio11Generator(name, platformName,
-                                   additionalPlatformDefinition)
+  const std::string& name, const std::string& platformName)
+  : cmGlobalVisualStudio11Generator(name, platformName)
 {
   this->DefaultPlatformToolset = "clang";
 }
@@ -90,7 +88,6 @@ cmLocalGenerator *cmGlobalVisualStudio11_Orbis_Generator::CreateLocalGenerator()
 {
   cmLocalVisualStudio10Generator* lg =
 		new cmLocalVisualStudio10Generator(cmLocalVisualStudioGenerator::VS12);
-  lg->SetPlatformName(this->GetPlatformName());
   lg->SetExtraFlagTable(cm_CLang_ExtraFlagTable);
   lg->SetGlobalGenerator(this);
   return lg;

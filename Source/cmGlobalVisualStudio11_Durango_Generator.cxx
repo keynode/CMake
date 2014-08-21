@@ -23,7 +23,7 @@ public:
     {
 			if (0 == strcmp(name.c_str(),durango_generatorName))
 			{
-				return new cmGlobalVisualStudio11_Durango_Generator(name, "Durango", "");
+				return new cmGlobalVisualStudio11_Durango_Generator(name, "Durango");
 			}
 			else
 			{

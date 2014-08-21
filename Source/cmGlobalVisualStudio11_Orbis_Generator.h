@@ -17,7 +17,7 @@
 class cmGlobalVisualStudio11_Orbis_Generator: public cmGlobalVisualStudio11Generator
 {
 public:
-  cmGlobalVisualStudio11_Orbis_Generator(const std::string& name, const std::string& platformName, const std::string& additionalPlatformDefinition);
+  cmGlobalVisualStudio11_Orbis_Generator(const std::string& name, const std::string& platformName);
   static cmGlobalGeneratorFactory* NewFactory();
 
   virtual bool MatchesGeneratorName(const std::string& name) const;
@@ -36,7 +36,7 @@ private:
 class cmGlobalVisualStudio12_Orbis_Generator : public cmGlobalVisualStudio12Generator
 {
 public:
-	cmGlobalVisualStudio12_Orbis_Generator(const std::string& name, const std::string& platformName, const std::string& additionalPlatformDefinition);
+	cmGlobalVisualStudio12_Orbis_Generator(const std::string& name, const std::string& platformName);
 	static cmGlobalGeneratorFactory* NewFactory();
 
 	virtual bool MatchesGeneratorName(const std::string& name) const;
