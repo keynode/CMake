@@ -364,6 +364,7 @@ void cmVisualStudio10TargetGenerator::Generate()
     (*this->BuildFileStream) << cmVS10EscapeXML(targetFrameworkVersion)
                              << "</TargetFrameworkVersion>\n";
     }
+  this->WriteCustomPropertyGroup("VS_GLOBAL_PROPERTY_GROUP_",2);
   this->WriteString("</PropertyGroup>\n", 1);
   this->WriteString("<Import Project="
                     "\"$(VCTargetsPath)\\Microsoft.Cpp.Default.props\" />\n",
@@ -587,6 +588,8 @@ void cmVisualStudio10TargetGenerator
   std::string mfcLine = "<UseOfMfc>";
   mfcLine += useOfMfcValue + "</UseOfMfc>\n";
   this->WriteString(mfcLine.c_str(), 2);
+
+  this->WriteCustomPropertyGroup("VS_PROJECT_CONFIG_PROPERTY_GROUP_",2);
 
   if((this->Target->GetType() <= cmTarget::OBJECT_LIBRARY &&
       this->ClOptions[config]->UsingUnicode()) ||
@@ -1471,6 +1474,8 @@ void cmVisualStudio10TargetGenerator::WritePathAndIncrementalLinkOptions()
       this->WritePlatformConfigTag("TargetExt", config->c_str(), 3);
       *this->BuildFileStream << cmVS10EscapeXML(ext) << "</TargetExt>\n";
 
+      this->WriteCustomPropertyGroup("VS_CONFIG_PROPERTY_GROUP_",3);
+
       this->OutputLinkIncremental(*config);
       }
     }
@@ -2100,6 +2105,25 @@ void cmVisualStudio10TargetGenerator::WriteUserMacros()
     }
   }
   this->WriteString("</PropertyGroup>\n", 1);
+}
+
+void cmVisualStudio10TargetGenerator::WriteCustomPropertyGroup( std::string targetPropertyPrefix,int ident )
+{
+  cmPropertyMap const& props = this->Target->GetProperties();
+  for(cmPropertyMap::const_iterator i = props.begin(); i != props.end(); ++i)
+  {
+    if(i->first.find(targetPropertyPrefix.c_str()) == 0)
+    {
+      std::string name = i->first.substr(targetPropertyPrefix.length());
+      if(name != "")
+      {
+        this->WriteString( "", ident);
+        (*this->BuildFileStream) << "<" << name << ">" 
+          << i->second.GetValue() 
+          << "</" << name.c_str() << ">\n";
+      }
+    }
+  }
 }
 
 void

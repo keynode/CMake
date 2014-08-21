@@ -70,6 +70,7 @@ private:
   void WritePathAndIncrementalLinkOptions();
   void WriteItemDefinitionGroups();
   void WriteUserMacros();
+  void WriteCustomPropertyGroup( std::string targetPropertyPrefix,int ident );
 
   bool ComputeClOptions();
   bool ComputeClOptions(std::string const& configName);
