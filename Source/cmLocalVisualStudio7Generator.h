@@ -55,6 +55,8 @@ public:
 
   void SetExtraFlagTable(cmVS7FlagTable const* table)
     { this->ExtraFlagTable = table; }
+  cmVS7FlagTable const* GetExtraFlagTable() const
+    { return this->ExtraFlagTable; }
   virtual std::string GetTargetDirectory(cmTarget const&) const;
   cmSourceFile* CreateVCProjBuildRule();
   void WriteStampFiles();

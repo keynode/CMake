@@ -1371,7 +1371,7 @@ bool cmVisualStudio10TargetGenerator::OutputSourceSpecificFlags(
       cmVisualStudioGeneratorOptions
         clOptions(this->LocalGenerator,
                   cmVisualStudioGeneratorOptions::Compiler,
-                  this->GetClFlagTable(), 0, this);
+                  this->GetClFlagTable(), this->LocalGenerator->GetExtraFlagTable(), this);
       if(compileAs)
         {
         clOptions.AddFlag("CompileAs", compileAs);
@@ -1553,7 +1553,7 @@ bool cmVisualStudio10TargetGenerator::ComputeClOptions(
 
   cmsys::auto_ptr<Options> pOptions(
     new Options(this->LocalGenerator, Options::Compiler,
-                this->GetClFlagTable()));
+                this->GetClFlagTable(),this->LocalGenerator->GetExtraFlagTable()));
   Options& clOptions = *pOptions;
 
   std::string flags;
