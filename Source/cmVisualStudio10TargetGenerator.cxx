@@ -1422,6 +1422,15 @@ void cmVisualStudio10TargetGenerator::WritePathAndIncrementalLinkOptions()
       intermediateDir += "/";
       intermediateDir += *config;
       intermediateDir += "/";
+
+      // Override intermediate directory of the optional VS_INTERMEDIATE_DIRECTORY_${CONFIG} property (VS_INTERMEDIATE_DIRECTORY_DEBUG,VS_INTERMEDIATE_DIRECTORY_RELEASE)
+      std::string vsIntDirProp = std::string("VS_INTERMEDIATE_DIRECTORY_") + cmSystemTools::UpperCase(*config);
+      const char* vsIntermediateDir = this->Target->GetProperty( vsIntDirProp.c_str() );
+      if (vsIntermediateDir)
+      {
+        intermediateDir = vsIntermediateDir;
+      }
+
       std::string outDir;
       std::string targetNameFull;
       if(ttype == cmTarget::OBJECT_LIBRARY)
