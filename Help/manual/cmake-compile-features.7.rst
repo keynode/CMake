@@ -3,7 +3,7 @@
 cmake-compile-features(7)
 *************************
 
-.. only:: html or latex
+.. only:: html
 
    .. contents::
 
@@ -28,7 +28,7 @@ CMake knows are known to the compiler, regardless of language standard
 or compile flags needed to use them.
 
 Features known to CMake are named mostly following the same convention
-as the Clang feature test macros.  The are some execptions, such as
+as the Clang feature test macros.  The are some exceptions, such as
 CMake using ``cxx_final`` and ``cxx_override`` instead of the single
 ``cxx_override_control`` used by Clang.
 
@@ -276,10 +276,13 @@ properties:
 .. code-block:: cmake
 
   add_library(foo INTERFACE)
+  set(with_variadics ${CMAKE_CURRENT_SOURCE_DIR}/with_variadics)
+  set(no_variadics ${CMAKE_CURRENT_SOURCE_DIR}/no_variadics)
   target_link_libraries(foo
     INTERFACE
-      "$<$<COMPILE_FEATURES:cxx_variadic_templates>:${CMAKE_CURRENT_SOURCE_DIR}/with_variadics>"
-      "$<$<NOT:$<COMPILE_FEATURES:cxx_variadic_templates>>:${CMAKE_CURRENT_SOURCE_DIR}/no_variadics>")
+      "$<$<COMPILE_FEATURES:cxx_variadic_templates>:${with_variadics}>"
+      "$<$<NOT:$<COMPILE_FEATURES:cxx_variadic_templates>>:${no_variadics}>"
+    )
 
 Consuming code then simply links to the ``foo`` target as usual and uses
 the feature-appropriate include directory

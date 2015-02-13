@@ -136,6 +136,14 @@ void cmGlobalVisualStudio8Generator
 ::EnableLanguage(std::vector<std::string>const &  lang,
                  cmMakefile *mf, bool optional)
 {
+  for(std::vector<std::string>::const_iterator it = lang.begin();
+      it != lang.end(); ++it)
+    {
+    if(*it == "ASM_MASM")
+      {
+      this->MasmEnabled = true;
+      }
+    }
   this->AddPlatformDefinitions(mf);
   cmGlobalVisualStudio7Generator::EnableLanguage(lang, mf, optional);
 }
@@ -148,6 +156,21 @@ void cmGlobalVisualStudio8Generator::AddPlatformDefinitions(cmMakefile* mf)
     mf->AddDefinition("CMAKE_VS_WINCE_VERSION",
       this->WindowsCEVersion.c_str());
   }
+}
+
+//----------------------------------------------------------------------------
+bool cmGlobalVisualStudio8Generator::SetGeneratorPlatform(std::string const& p,
+                                                          cmMakefile* mf)
+{
+  if(this->DefaultPlatformName == "Win32")
+    {
+    this->GeneratorPlatform = p;
+    return this->cmGlobalVisualStudio7Generator::SetGeneratorPlatform("", mf);
+    }
+  else
+    {
+    return this->cmGlobalVisualStudio7Generator::SetGeneratorPlatform(p, mf);
+    }
 }
 
 //----------------------------------------------------------------------------
@@ -318,9 +341,10 @@ bool cmGlobalVisualStudio8Generator::AddCheckTarget()
   // overwritten by the CreateVCProjBuildRule.
   // (this could be avoided with per-target source files)
   std::string no_main_dependency = "";
+  std::vector<std::string> no_byproducts;
   if(cmSourceFile* file =
      mf->AddCustomCommandToOutput(
-       stamps, listFiles,
+       stamps, no_byproducts, listFiles,
        no_main_dependency, commandLines, "Checking Build System",
        no_working_directory, true))
     {

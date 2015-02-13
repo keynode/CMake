@@ -26,7 +26,6 @@
 #include <cmsys/CommandLineArguments.hxx>
 #include <cmsys/SystemTools.hxx>
 #include <cmsys/Encoding.hxx>
-#include <locale.h>
 
 //----------------------------------------------------------------------------
 static const char * cmDocumentationName[][2] =
@@ -101,7 +100,6 @@ int cpackDefinitionArgument(const char* argument, const char* cValue,
 // this is CPack.
 int main (int argc, char const* const* argv)
 {
-  setlocale(LC_CTYPE, "");
   cmsys::Encoding::CommandLineArguments args =
     cmsys::Encoding::CommandLineArguments::Main(argc, argv);
   argc = args.argc();
@@ -117,7 +115,7 @@ int main (int argc, char const* const* argv)
 
   cmSystemTools::EnableMSVCDebugHook();
 
-  if ( cmSystemTools::GetCurrentWorkingDirectory().size() == 0 )
+  if (cmSystemTools::GetCurrentWorkingDirectory().empty())
     {
     cmCPack_Log(&log, cmCPackLog::LOG_ERROR,
       "Current working directory cannot be established." << std::endl);
@@ -267,7 +265,7 @@ int main (int argc, char const* const* argv)
     if ( cmSystemTools::FileExists(cpackConfigFile.c_str()) )
       {
       cpackConfigFile =
-        cmSystemTools::CollapseFullPath(cpackConfigFile.c_str());
+        cmSystemTools::CollapseFullPath(cpackConfigFile);
       cmCPack_Log(&log, cmCPackLog::LOG_VERBOSE,
         "Read CPack configuration file: " << cpackConfigFile
         << std::endl);
@@ -343,7 +341,6 @@ int main (int argc, char const* const* argv)
       {
       cmCPack_Log(&log, cmCPackLog::LOG_ERROR,
         "CPack generator not specified" << std::endl);
-      parsed = 0;
       }
     else
       {
@@ -427,7 +424,7 @@ int main (int argc, char const* const* argv)
                 = mf->GetDefinition("CPACK_PACKAGE_VERSION_MINOR");
               const char* projVersionPatch
                 = mf->GetDefinition("CPACK_PACKAGE_VERSION_PATCH");
-              cmOStringStream ostr;
+              std::ostringstream ostr;
               ostr << projVersionMajor << "." << projVersionMinor << "."
                 << projVersionPatch;
               mf->AddDefinition("CPACK_PACKAGE_VERSION",

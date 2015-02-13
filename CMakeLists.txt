@@ -36,8 +36,16 @@ if("${CMake_SOURCE_DIR}" STREQUAL "${CMAKE_SOURCE_DIR}")
   endmacro()
 endif()
 
+# Use most-recent available language dialects with GNU and Clang
+if(NOT DEFINED CMAKE_C_STANDARD)
+  set(CMAKE_C_STANDARD 11)
+endif()
+if(NOT DEFINED CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 14)
+endif()
+
 # option to set the internal encoding of CMake to UTF-8
-option(CMAKE_ENCODING_UTF8 "Use UTF-8 encoding internally (experimental)." OFF)
+option(CMAKE_ENCODING_UTF8 "Use UTF-8 encoding internally." ON)
 mark_as_advanced(CMAKE_ENCODING_UTF8)
 if(CMAKE_ENCODING_UTF8)
   set(KWSYS_ENCODING_DEFAULT_CODEPAGE CP_UTF8)
@@ -57,7 +65,7 @@ macro(CMAKE_HANDLE_SYSTEM_LIBRARIES)
 
   # Allow the user to enable/disable all system utility library options by
   # defining CMAKE_USE_SYSTEM_LIBRARIES or CMAKE_USE_SYSTEM_LIBRARY_${util}.
-  set(UTILITIES BZIP2 CURL EXPAT LIBARCHIVE LIBLZMA ZLIB)
+  set(UTILITIES BZIP2 CURL EXPAT FORM JSONCPP LIBARCHIVE LIBLZMA ZLIB)
   foreach(util ${UTILITIES})
     if(NOT DEFINED CMAKE_USE_SYSTEM_LIBRARY_${util}
         AND DEFINED CMAKE_USE_SYSTEM_LIBRARIES)
@@ -95,6 +103,8 @@ macro(CMAKE_HANDLE_SYSTEM_LIBRARIES)
     "${CMAKE_USE_SYSTEM_LIBRARY_BZIP2}" "NOT CMAKE_USE_SYSTEM_LIBARCHIVE" ON)
   CMAKE_DEPENDENT_OPTION(CMAKE_USE_SYSTEM_LIBLZMA "Use system-installed liblzma"
     "${CMAKE_USE_SYSTEM_LIBRARY_LIBLZMA}" "NOT CMAKE_USE_SYSTEM_LIBARCHIVE" ON)
+  option(CMAKE_USE_SYSTEM_FORM "Use system-installed libform" "${CMAKE_USE_SYSTEM_LIBRARY_FORM}")
+  option(CMAKE_USE_SYSTEM_JSONCPP "Use system-installed jsoncpp" "${CMAKE_USE_SYSTEM_LIBRARY_JSONCPP}")
 
   # Mention to the user what system libraries are being used.
   foreach(util ${UTILITIES})
@@ -115,7 +125,7 @@ endmacro()
 
 if(NOT CMake_TEST_EXTERNAL_CMAKE)
   set(CMAKE_BUILD_ON_VISUAL_STUDIO 0)
-  if(WIN32 AND NOT UNIX AND NOT BORLAND AND NOT MINGW )
+  if(WIN32 AND NOT UNIX AND NOT MINGW)
     set(CMAKE_BUILD_ON_VISUAL_STUDIO 1)
   endif()
 endif()
@@ -271,14 +281,18 @@ macro (CMAKE_BUILD_UTILITIES)
     set(CURL_SPECIAL_ZLIB_H ${CMAKE_ZLIB_HEADER})
     set(CURL_SPECIAL_LIBZ_INCLUDES ${CMAKE_ZLIB_INCLUDES})
     set(CURL_SPECIAL_LIBZ ${CMAKE_ZLIB_LIBRARIES})
-    option(CMAKE_BUILD_CURL_SHARED "Should curl be built shared" FALSE)
-    if(NOT CMAKE_BUILD_CURL_SHARED)
-      add_definitions(-DCURL_STATICLIB)
-    endif()
+    add_definitions(-DCURL_STATICLIB)
     set(CMAKE_CURL_INCLUDES)
     set(CMAKE_CURL_LIBRARIES cmcurl)
     if(CMAKE_TESTS_CDASH_SERVER)
       set(CMAKE_CURL_TEST_URL "${CMAKE_TESTS_CDASH_SERVER}/user.php")
+    endif()
+    option(CMAKE_USE_OPENSSL "Use OpenSSL." OFF)
+    mark_as_advanced(CMAKE_USE_OPENSSL)
+    if(CMAKE_USE_OPENSSL)
+      set(CURL_CA_BUNDLE "" CACHE FILEPATH "Path to SSL CA Certificate Bundle")
+      set(CURL_CA_PATH "" CACHE PATH "Path to SSL CA Certificate Directory")
+      mark_as_advanced(CURL_CA_BUNDLE CURL_CA_PATH)
     endif()
     add_subdirectory(Utilities/cmcurl)
     CMAKE_SET_TARGET_FOLDER(cmcurl "Utilities/3rdParty")
@@ -322,7 +336,7 @@ macro (CMAKE_BUILD_UTILITIES)
   #---------------------------------------------------------------------
   # Build or use system libarchive for CMake and CTest.
   if(CMAKE_USE_SYSTEM_LIBARCHIVE)
-    find_package(LibArchive)
+    find_package(LibArchive 3.0.0)
     if(NOT LibArchive_FOUND)
       message(FATAL_ERROR "CMAKE_USE_SYSTEM_LIBARCHIVE is ON but LibArchive is not found!")
     endif()
@@ -366,6 +380,27 @@ macro (CMAKE_BUILD_UTILITIES)
   endif()
 
   #---------------------------------------------------------------------
+  # Build jsoncpp library.
+  if(CMAKE_USE_SYSTEM_JSONCPP)
+    if(EXISTS ${CMAKE_ROOT}/Modules/FindJsonCpp.cmake)
+      find_package(JsonCpp)
+    elseif(NOT CMAKE_VERSION VERSION_LESS 3.0)
+      include(${CMake_SOURCE_DIR}/Modules/FindJsonCpp.cmake)
+    else()
+      message(FATAL_ERROR "CMAKE_USE_SYSTEM_JSONCPP requires CMake >= 3.0")
+    endif()
+    if(NOT JsonCpp_FOUND)
+      message(FATAL_ERROR
+        "CMAKE_USE_SYSTEM_JSONCPP is ON but a JsonCpp is not found!")
+    endif()
+    set(CMAKE_JSONCPP_LIBRARIES JsonCpp::JsonCpp)
+  else()
+    set(CMAKE_JSONCPP_LIBRARIES cmjsoncpp)
+    add_subdirectory(Utilities/cmjsoncpp)
+    CMAKE_SET_TARGET_FOLDER(cmjsoncpp "Utilities/3rdParty")
+  endif()
+
+  #---------------------------------------------------------------------
   # Build XMLRPC library for CMake and CTest.
   if(CTEST_USE_XMLRPC)
     find_package(XMLRPC QUIET REQUIRED libwww-client)
@@ -381,7 +416,7 @@ macro (CMAKE_BUILD_UTILITIES)
   # Use curses?
   if (UNIX)
     # there is a bug in the Syllable libraries which makes linking ccmake fail, Alex
-    if(NOT "${CMAKE_SYSTEM_NAME}" MATCHES syllable)
+    if(NOT CMAKE_SYSTEM_NAME MATCHES syllable)
       set(CURSES_NEED_NCURSES TRUE)
       find_package(Curses QUIET)
       if (CURSES_LIBRARY)
@@ -397,7 +432,11 @@ macro (CMAKE_BUILD_UTILITIES)
     set(BUILD_CursesDialog 0)
   endif ()
   if(BUILD_CursesDialog)
-    add_subdirectory(Source/CursesDialog/form)
+    if(NOT CMAKE_USE_SYSTEM_FORM)
+      add_subdirectory(Source/CursesDialog/form)
+    elseif(NOT CURSES_FORM_LIBRARY)
+      message( FATAL_ERROR "CMAKE_USE_SYSTEM_FORM in ON but CURSES_FORM_LIBRARY is not set!" )
+    endif()
   endif()
 endmacro ()
 
@@ -552,14 +591,10 @@ endif()
 
 # setup some Testing support (a macro defined in this file)
 CMAKE_SETUP_TESTING()
-configure_file(
-  "${CMAKE_CURRENT_SOURCE_DIR}/DartLocal.conf.in"
-  "${CMAKE_CURRENT_BINARY_DIR}/DartLocal.conf"
-  COPYONLY)
 
 if(NOT CMake_TEST_EXTERNAL_CMAKE)
   if(NOT CMake_VERSION_IS_RELEASE)
-    if("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU" AND
+    if(CMAKE_C_COMPILER_ID STREQUAL "GNU" AND
         NOT "${CMAKE_C_COMPILER_VERSION}" VERSION_LESS 4.2)
       set(C_FLAGS_LIST -Wcast-align -Werror-implicit-function-declaration -Wchar-subscripts
                        -Wall -W -Wpointer-arith -Wwrite-strings -Wformat-security
@@ -593,7 +628,6 @@ if(NOT CMake_TEST_EXTERNAL_CMAKE)
   if(BUILD_TESTING)
     CMAKE_SET_TARGET_FOLDER(CMakeLibTests "Tests")
   endif()
-  CMAKE_SET_TARGET_FOLDER(cmw9xcom "Utilities/Win9xCompat")
   if(TARGET documentation)
     CMAKE_SET_TARGET_FOLDER(documentation "Documentation")
   endif()

@@ -81,7 +81,7 @@ bool cmExportFileGenerator::GenerateImportFile()
   if(!foutPtr.get() || !*foutPtr)
     {
     std::string se = cmSystemTools::GetLastSystemError();
-    cmOStringStream e;
+    std::ostringstream e;
     e << "cannot write to file \"" << this->MainImportFile
       << "\": " << se;
     cmSystemTools::Error(e.str().c_str());
@@ -224,7 +224,7 @@ static bool isSubDirectory(const char* a, const char* b)
 
 //----------------------------------------------------------------------------
 static bool checkInterfaceDirs(const std::string &prepro,
-                      cmTarget *target)
+                      cmTarget *target, const std::string& prop)
 {
   const char* installDir =
             target->GetMakefile()->GetSafeDefinition("CMAKE_INSTALL_PREFIX");
@@ -247,23 +247,30 @@ static bool checkInterfaceDirs(const std::string &prepro,
       continue;
       }
     cmake::MessageType messageType = cmake::FATAL_ERROR;
-    cmOStringStream e;
+    std::ostringstream e;
     if (genexPos != std::string::npos)
       {
-      switch (target->GetPolicyStatusCMP0041())
+      if (prop == "INTERFACE_INCLUDE_DIRECTORIES")
         {
-        case cmPolicies::WARN:
-          messageType = cmake::WARNING;
-          e << target->GetMakefile()->GetPolicies()
-                      ->GetPolicyWarning(cmPolicies::CMP0041) << "\n";
-          break;
-        case cmPolicies::OLD:
-          continue;
-        case cmPolicies::REQUIRED_IF_USED:
-        case cmPolicies::REQUIRED_ALWAYS:
-        case cmPolicies::NEW:
-          hadFatalError = true;
-          break; // Issue fatal message.
+        switch (target->GetPolicyStatusCMP0041())
+          {
+          case cmPolicies::WARN:
+            messageType = cmake::WARNING;
+            e << target->GetMakefile()->GetPolicies()
+                        ->GetPolicyWarning(cmPolicies::CMP0041) << "\n";
+            break;
+          case cmPolicies::OLD:
+            continue;
+          case cmPolicies::REQUIRED_IF_USED:
+          case cmPolicies::REQUIRED_ALWAYS:
+          case cmPolicies::NEW:
+            hadFatalError = true;
+            break; // Issue fatal message.
+          }
+        }
+      else
+        {
+        hadFatalError = true;
         }
       }
     if (cmHasLiteralPrefix(li->c_str(), "${_IMPORT_PREFIX}"))
@@ -272,8 +279,8 @@ static bool checkInterfaceDirs(const std::string &prepro,
       }
     if (!cmSystemTools::FileIsFullPath(li->c_str()))
       {
-      e << "Target \"" << target->GetName() << "\" "
-           "INTERFACE_INCLUDE_DIRECTORIES property contains relative path:\n"
+      e << "Target \"" << target->GetName() << "\" " << prop <<
+           " property contains relative path:\n"
            "  \"" << *li << "\"";
       target->GetMakefile()->IssueMessage(messageType, e.str());
       }
@@ -289,32 +296,35 @@ static bool checkInterfaceDirs(const std::string &prepro,
         (!inBinary || isSubDirectory(installDir, topBinaryDir)) &&
         (!inSource || isSubDirectory(installDir, topSourceDir));
 
-      if (!shouldContinue)
+      if (prop == "INTERFACE_INCLUDE_DIRECTORIES")
         {
-        switch(target->GetPolicyStatusCMP0052())
+        if (!shouldContinue)
           {
-          case cmPolicies::WARN:
+          switch(target->GetPolicyStatusCMP0052())
             {
-            cmOStringStream s;
-            s << target->GetMakefile()->GetPolicies()
-                      ->GetPolicyWarning(cmPolicies::CMP0052) << "\n";
-            s << "Directory:\n    \"" << *li << "\"\nin "
-              "INTERFACE_INCLUDE_DIRECTORIES of target \""
-              << target->GetName() << "\" is a subdirectory of the install "
-              "directory:\n    \"" << installDir << "\"\nhowever it is also "
-              "a subdirectory of the " << (inBinary ? "build" : "source")
-              << " tree:\n    \"" << (inBinary ? topBinaryDir : topSourceDir)
-              << "\"" << std::endl;
-            target->GetMakefile()->IssueMessage(cmake::AUTHOR_WARNING,
-                                                s.str());
+            case cmPolicies::WARN:
+              {
+              std::ostringstream s;
+              s << target->GetMakefile()->GetPolicies()
+                        ->GetPolicyWarning(cmPolicies::CMP0052) << "\n";
+              s << "Directory:\n    \"" << *li << "\"\nin "
+                "INTERFACE_INCLUDE_DIRECTORIES of target \""
+                << target->GetName() << "\" is a subdirectory of the install "
+                "directory:\n    \"" << installDir << "\"\nhowever it is also "
+                "a subdirectory of the " << (inBinary ? "build" : "source")
+                << " tree:\n    \"" << (inBinary ? topBinaryDir : topSourceDir)
+                << "\"" << std::endl;
+              target->GetMakefile()->IssueMessage(cmake::AUTHOR_WARNING,
+                                                  s.str());
+              }
+            case cmPolicies::OLD:
+              shouldContinue = true;
+              break;
+            case cmPolicies::REQUIRED_ALWAYS:
+            case cmPolicies::REQUIRED_IF_USED:
+            case cmPolicies::NEW:
+              break;
             }
-          case cmPolicies::OLD:
-            shouldContinue = true;
-            break;
-          case cmPolicies::REQUIRED_ALWAYS:
-          case cmPolicies::REQUIRED_IF_USED:
-          case cmPolicies::NEW:
-            break;
           }
         }
       if (shouldContinue)
@@ -324,8 +334,8 @@ static bool checkInterfaceDirs(const std::string &prepro,
       }
     if (inBinary)
       {
-      e << "Target \"" << target->GetName() << "\" "
-           "INTERFACE_INCLUDE_DIRECTORIES property contains path:\n"
+      e << "Target \"" << target->GetName() << "\" " << prop <<
+           " property contains path:\n"
            "  \"" << *li << "\"\nwhich is prefixed in the build directory.";
       target->GetMakefile()->IssueMessage(messageType, e.str());
       }
@@ -333,8 +343,8 @@ static bool checkInterfaceDirs(const std::string &prepro,
       {
       if (inSource)
         {
-        e << "Target \"" << target->GetName() << "\" "
-            "INTERFACE_INCLUDE_DIRECTORIES property contains path:\n"
+        e << "Target \"" << target->GetName() << "\" " << prop <<
+            " property contains path:\n"
             "  \"" << *li << "\"\nwhich is prefixed in the source directory.";
         target->GetMakefile()->IssueMessage(messageType, e.str());
         }
@@ -365,6 +375,46 @@ static void prefixItems(std::string &exportDirs)
 }
 
 //----------------------------------------------------------------------------
+void cmExportFileGenerator::PopulateSourcesInterface(
+                      cmTargetExport *tei,
+                      cmGeneratorExpression::PreprocessContext preprocessRule,
+                      ImportPropertyMap &properties,
+                      std::vector<std::string> &missingTargets)
+{
+  cmTarget *target = tei->Target;
+  assert(preprocessRule == cmGeneratorExpression::InstallInterface);
+
+  const char *propName = "INTERFACE_SOURCES";
+  const char *input = target->GetProperty(propName);
+
+  if (!input)
+    {
+    return;
+    }
+
+  if (!*input)
+    {
+    properties[propName] = "";
+    return;
+    }
+
+  std::string prepro = cmGeneratorExpression::Preprocess(input,
+                                                         preprocessRule,
+                                                         true);
+  if (!prepro.empty())
+    {
+    this->ResolveTargetsInGeneratorExpressions(prepro, target,
+                                                missingTargets);
+
+    if (!checkInterfaceDirs(prepro, target, propName))
+      {
+      return;
+      }
+    properties[propName] = prepro;
+    }
+}
+
+//----------------------------------------------------------------------------
 void cmExportFileGenerator::PopulateIncludeDirectoriesInterface(
                       cmTargetExport *tei,
                       cmGeneratorExpression::PreprocessContext preprocessRule,
@@ -391,7 +441,7 @@ void cmExportFileGenerator::PopulateIncludeDirectoriesInterface(
   if (cge->GetHadContextSensitiveCondition())
     {
     cmMakefile* mf = target->GetMakefile();
-    cmOStringStream e;
+    std::ostringstream e;
     e << "Target \"" << target->GetName() << "\" is installed with "
     "INCLUDES DESTINATION set to a context sensitive path.  Paths which "
     "depend on the configuration, policy values or the link interface are "
@@ -424,7 +474,7 @@ void cmExportFileGenerator::PopulateIncludeDirectoriesInterface(
     this->ResolveTargetsInGeneratorExpressions(prepro, target,
                                                 missingTargets);
 
-    if (!checkInterfaceDirs(prepro, target))
+    if (!checkInterfaceDirs(prepro, target, propName))
       {
       return;
       }
@@ -456,11 +506,7 @@ void getPropertyContents(cmTarget const* tgt, const std::string& prop,
     }
   std::vector<std::string> content;
   cmSystemTools::ExpandListArgument(p, content);
-  for (std::vector<std::string>::const_iterator ci = content.begin();
-    ci != content.end(); ++ci)
-    {
-    ifaceProperties.insert(*ci);
-    }
+  ifaceProperties.insert(content.begin(), content.end());
 }
 
 //----------------------------------------------------------------------------
@@ -473,7 +519,7 @@ void getCompatibleInterfaceProperties(cmTarget *target,
   if (!info)
     {
     cmMakefile* mf = target->GetMakefile();
-    cmOStringStream e;
+    std::ostringstream e;
     e << "Exporting the target \"" << target->GetName() << "\" is not "
         "allowed since its linker language cannot be determined";
     mf->IssueMessage(cmake::FATAL_ERROR, e.str());
@@ -773,7 +819,7 @@ cmExportFileGenerator
   if(newCMP0022Behavior && !this->ExportOld)
     {
     cmMakefile *mf = target->GetMakefile();
-    cmOStringStream e;
+    std::ostringstream e;
     e << "Target \"" << target->GetName() << "\" has policy CMP0022 enabled, "
          "but also has old-style LINK_INTERFACE_LIBRARIES properties "
          "populated, but it was exported without the "
@@ -857,7 +903,7 @@ cmExportFileGenerator
       {
       std::string prop = "IMPORTED_LINK_INTERFACE_MULTIPLICITY";
       prop += suffix;
-      cmOStringStream m;
+      std::ostringstream m;
       m << iface->Multiplicity;
       properties[prop] = m.str();
       }

@@ -200,12 +200,7 @@ cmComputeLinkDepends
 //----------------------------------------------------------------------------
 cmComputeLinkDepends::~cmComputeLinkDepends()
 {
-  for(std::vector<DependSetList*>::iterator
-        i = this->InferredDependSets.begin();
-      i != this->InferredDependSets.end(); ++i)
-    {
-    delete *i;
-    }
+  cmDeleteAll(this->InferredDependSets);
   delete this->CCG;
 }
 
@@ -263,21 +258,26 @@ cmComputeLinkDepends::Compute()
   this->OrderLinkEntires();
 
   // Compute the final set of link entries.
+  // Iterate in reverse order so we can keep only the last occurrence
+  // of a shared library.
   std::set<int> emmitted;
-  for(std::vector<int>::const_iterator li = this->FinalLinkOrder.begin();
-      li != this->FinalLinkOrder.end(); ++li)
+  for(std::vector<int>::const_reverse_iterator
+        li = this->FinalLinkOrder.rbegin(),
+        le = this->FinalLinkOrder.rend();
+      li != le; ++li)
     {
     int i = *li;
     LinkEntry const& e = this->EntryList[i];
     cmTarget const* t = e.Target;
-    // Entries that we know the linker will re-use for symbols
-    // needed by later entries do not need to be repeated.
+    // Entries that we know the linker will re-use do not need to be repeated.
     bool uniquify = t && t->GetType() == cmTarget::SHARED_LIBRARY;
     if(!uniquify || emmitted.insert(i).second)
       {
       this->FinalLinkEntries.push_back(e);
       }
     }
+  // Reverse the resulting order since we iterated in reverse.
+  std::reverse(this->FinalLinkEntries.begin(), this->FinalLinkEntries.end());
 
   // Display the final set.
   if(this->DebugMode)
@@ -669,18 +669,15 @@ void cmComputeLinkDepends::InferDependencies()
     for(++i; i != sets->end(); ++i)
       {
       DependSet intersection;
-      cmsys_stl::set_intersection
+      std::set_intersection
         (common.begin(), common.end(), i->begin(), i->end(),
          std::inserter(intersection, intersection.begin()));
       common = intersection;
       }
 
     // Add the inferred dependencies to the graph.
-    for(DependSet::const_iterator j = common.begin(); j != common.end(); ++j)
-      {
-      int dependee_index = *j;
-      this->EntryConstraintGraph[depender_index].push_back(dependee_index);
-      }
+    cmGraphEdgeList& edges = this->EntryConstraintGraph[depender_index];
+    edges.insert(edges.end(), common.begin(), common.end());
     }
 }
 
@@ -692,11 +689,10 @@ void cmComputeLinkDepends::CleanConstraintGraph()
     {
     // Sort the outgoing edges for each graph node so that the
     // original order will be preserved as much as possible.
-    cmsys_stl::sort(i->begin(), i->end());
+    std::sort(i->begin(), i->end());
 
     // Make the edge list unique.
-    EdgeList::iterator last = cmsys_stl::unique(i->begin(), i->end());
-    i->erase(last, i->end());
+    i->erase(std::unique(i->begin(), i->end()), i->end());
     }
 }
 
@@ -704,7 +700,7 @@ void cmComputeLinkDepends::CleanConstraintGraph()
 void cmComputeLinkDepends::DisplayConstraintGraph()
 {
   // Display the graph nodes and their edges.
-  cmOStringStream e;
+  std::ostringstream e;
   for(unsigned int i=0; i < this->EntryConstraintGraph.size(); ++i)
     {
     EdgeList const& nl = this->EntryConstraintGraph[i];

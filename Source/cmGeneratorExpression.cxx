@@ -15,8 +15,6 @@
 #include "cmTarget.h"
 #include "assert.h"
 
-#include <cmsys/String.h>
-
 #include "cmGeneratorExpressionEvaluator.h"
 #include "cmGeneratorExpressionLexer.h"
 #include "cmGeneratorExpressionParser.h"
@@ -33,18 +31,10 @@ cmGeneratorExpression::cmGeneratorExpression(
 cmsys::auto_ptr<cmCompiledGeneratorExpression>
 cmGeneratorExpression::Parse(std::string const& input)
 {
-#if !defined(__BORLANDC__)
   return cmsys::auto_ptr<cmCompiledGeneratorExpression>(
     new cmCompiledGeneratorExpression(
       this->Backtrace ? *this->Backtrace : cmListFileBacktrace(NULL),
       input));
-#else
-  cmListFileBacktrace emptyBacktrace(NULL);
-  return cmsys::auto_ptr<cmCompiledGeneratorExpression>(
-    new cmCompiledGeneratorExpression(
-      this->Backtrace ? *this->Backtrace : emptyBacktrace,
-      input));
-#endif
 }
 
 //----------------------------------------------------------------------------
@@ -98,6 +88,7 @@ const char *cmCompiledGeneratorExpression::Evaluate(
   context.HadError = false;
   context.HadContextSensitiveCondition = false;
   context.HadHeadSensitiveCondition = false;
+  context.SourceSensitiveTargets.clear();
   context.HeadTarget = headTarget;
   context.EvaluateForBuildsystem = this->EvaluateForBuildsystem;
   context.CurrentTarget = currentTarget ? currentTarget : headTarget;
@@ -107,12 +98,8 @@ const char *cmCompiledGeneratorExpression::Evaluate(
     {
     this->Output += (*it)->Evaluate(&context, dagChecker);
 
-    for(std::set<std::string>::const_iterator
-          p = context.SeenTargetProperties.begin();
-          p != context.SeenTargetProperties.end(); ++p)
-      {
-      this->SeenTargetProperties.insert(*p);
-      }
+    this->SeenTargetProperties.insert(context.SeenTargetProperties.begin(),
+                                      context.SeenTargetProperties.end());
     if (context.HadError)
       {
       this->Output = "";
@@ -126,6 +113,7 @@ const char *cmCompiledGeneratorExpression::Evaluate(
     {
     this->HadContextSensitiveCondition = context.HadContextSensitiveCondition;
     this->HadHeadSensitiveCondition = context.HadHeadSensitiveCondition;
+    this->SourceSensitiveTargets = context.SourceSensitiveTargets;
     }
 
   this->DependTargets = context.DependTargets;
@@ -158,15 +146,7 @@ cmCompiledGeneratorExpression::cmCompiledGeneratorExpression(
 //----------------------------------------------------------------------------
 cmCompiledGeneratorExpression::~cmCompiledGeneratorExpression()
 {
-  std::vector<cmGeneratorExpressionEvaluator*>::const_iterator it
-                                                  = this->Evaluators.begin();
-  const std::vector<cmGeneratorExpressionEvaluator*>::const_iterator end
-                                                  = this->Evaluators.end();
-
-  for ( ; it != end; ++it)
-    {
-    delete *it;
-    }
+  cmDeleteAll(this->Evaluators);
 }
 
 //----------------------------------------------------------------------------
@@ -453,7 +433,7 @@ std::string cmGeneratorExpression::Preprocess(const std::string &input,
     return stripExportInterface(input, context, resolveRelative);
     }
 
-  assert(!"cmGeneratorExpression::Preprocess called with invalid args");
+  assert(0 && "cmGeneratorExpression::Preprocess called with invalid args");
   return std::string();
 }
 

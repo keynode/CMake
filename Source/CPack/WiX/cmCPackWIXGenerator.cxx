@@ -360,6 +360,29 @@ void cmCPackWIXGenerator::CreateWiXPropertiesIncludeFile()
       includeFile.EndElement("Property");
       }
     }
+
+  if(GetOption("CPACK_WIX_PROPERTY_ARPINSTALLLOCATION") == 0)
+    {
+    includeFile.BeginElement("Property");
+    includeFile.AddAttribute("Id", "INSTALL_ROOT");
+    includeFile.AddAttribute("Secure", "yes");
+
+    includeFile.BeginElement("RegistrySearch");
+    includeFile.AddAttribute("Id", "FindInstallLocation");
+    includeFile.AddAttribute("Root", "HKLM");
+    includeFile.AddAttribute("Key", "Software\\Microsoft\\Windows\\"
+      "CurrentVersion\\Uninstall\\[WIX_UPGRADE_DETECTED]");
+    includeFile.AddAttribute("Name", "InstallLocation");
+    includeFile.AddAttribute("Type", "raw");
+    includeFile.EndElement("RegistrySearch");
+    includeFile.EndElement("Property");
+
+    includeFile.BeginElement("SetProperty");
+    includeFile.AddAttribute("Id", "ARPINSTALLLOCATION");
+    includeFile.AddAttribute("Value", "[INSTALL_ROOT]");
+    includeFile.AddAttribute("After", "CostFinalize");
+    includeFile.EndElement("SetProperty");
+    }
 }
 
 void cmCPackWIXGenerator::CopyDefinition(
@@ -824,13 +847,42 @@ void cmCPackWIXGenerator::AddDirectoryAndFileDefinitons(
   cmsys::Directory dir;
   dir.Load(topdir.c_str());
 
-  if(dir.GetNumberOfFiles() == 2)
+  std::string relativeDirectoryPath =
+    cmSystemTools::RelativePath(toplevel.c_str(), topdir.c_str());
+
+  if(relativeDirectoryPath.empty())
+    {
+    relativeDirectoryPath = ".";
+    }
+
+  cmInstalledFile const* directoryInstalledFile =
+    this->GetInstalledFile(relativeDirectoryPath);
+
+  bool emptyDirectory = dir.GetNumberOfFiles() == 2;
+  bool createDirectory = false;
+
+  if(emptyDirectory)
+    {
+    createDirectory = true;
+    }
+
+  if(directoryInstalledFile)
+    {
+    if(directoryInstalledFile->HasProperty("CPACK_WIX_ACL"))
+      {
+      createDirectory = true;
+      }
+    }
+
+  if(createDirectory)
     {
     std::string componentId = fileDefinitions.EmitComponentCreateFolder(
-      directoryId, GenerateGUID());
-
+      directoryId, GenerateGUID(), directoryInstalledFile);
     featureDefinitions.EmitComponentRef(componentId);
+    }
 
+  if(emptyDirectory)
+    {
     return;
     }
 
@@ -1098,12 +1150,7 @@ void cmCPackWIXGenerator::CollectExtensions(
 
   std::vector<std::string> list;
   cmSystemTools::ExpandListArgument(variableContent, list);
-
-  for(std::vector<std::string>::const_iterator i = list.begin();
-    i != list.end(); ++i)
-    {
-    extensions.insert(*i);
-    }
+  extensions.insert(list.begin(), list.end());
 }
 
 void cmCPackWIXGenerator::AddCustomFlags(

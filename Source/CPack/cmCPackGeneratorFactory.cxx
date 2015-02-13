@@ -21,7 +21,7 @@
 #include "cmCPack7zGenerator.h"
 #include "cmCPackSTGZGenerator.h"
 #include "cmCPackNSISGenerator.h"
-#include "cmCPackIFWGenerator.h"
+#include "IFW/cmCPackIFWGenerator.h"
 
 #ifdef __APPLE__
 #  include "cmCPackDragNDropGenerator.h"
@@ -46,10 +46,8 @@
 #endif
 
 #include "cmCPackLog.h"
+#include "cmAlgorithms.h"
 
-#if defined(__BORLANDC__)
-# pragma warn -8008 /* condition is always true */
-#endif
 
 //----------------------------------------------------------------------
 cmCPackGeneratorFactory::cmCPackGeneratorFactory()
@@ -161,11 +159,7 @@ cmCPackGeneratorFactory::cmCPackGeneratorFactory()
 //----------------------------------------------------------------------
 cmCPackGeneratorFactory::~cmCPackGeneratorFactory()
 {
-  std::vector<cmCPackGenerator*>::iterator it;
-  for ( it = this->Generators.begin(); it != this->Generators.end(); ++ it )
-    {
-    delete *it;
-    }
+  cmDeleteAll(this->Generators);
 }
 
 //----------------------------------------------------------------------

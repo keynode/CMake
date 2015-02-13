@@ -124,7 +124,7 @@ static bool CheckFileOperations()
     res = false;
     }
 
-  if (kwsys::SystemTools::FileLength(testBinFile.c_str()) != 766)
+  if (kwsys::SystemTools::FileLength(testBinFile) != 766)
     {
     kwsys_ios::cerr
       << "Problem with FileLength - incorrect length for: "
@@ -132,7 +132,7 @@ static bool CheckFileOperations()
     res = false;
     }
 
-  if (!kwsys::SystemTools::MakeDirectory(testNewDir.c_str()))
+  if (!kwsys::SystemTools::MakeDirectory(testNewDir))
     {
     kwsys_ios::cerr
       << "Problem with MakeDirectory for: "
@@ -148,7 +148,7 @@ static bool CheckFileOperations()
     res = false;
     }
 
-  if (!kwsys::SystemTools::RemoveFile(testNewFile.c_str()))
+  if (!kwsys::SystemTools::RemoveFile(testNewFile))
     {
     kwsys_ios::cerr
       << "Problem with RemoveFile: "
@@ -157,7 +157,7 @@ static bool CheckFileOperations()
     }
 
   kwsys::SystemTools::Touch(testNewFile.c_str(), true);
-  if (!kwsys::SystemTools::RemoveADirectory(testNewDir.c_str()))
+  if (!kwsys::SystemTools::RemoveADirectory(testNewDir))
     {
     kwsys_ios::cerr
       << "Problem with RemoveADirectory for: "
@@ -183,7 +183,7 @@ static bool CheckFileOperations()
     "012345678901234567890123456789012345678901234567890123456789"
     "0123456789.txt");
 
-  if (!kwsys::SystemTools::MakeDirectory(testNewLongDir.c_str()))
+  if (!kwsys::SystemTools::MakeDirectory(testNewLongDir))
     {
     kwsys_ios::cerr
       << "Problem with MakeDirectory for: "
@@ -199,7 +199,7 @@ static bool CheckFileOperations()
     res = false;
     }
 
-  if (!kwsys::SystemTools::RemoveFile(testNewLongFile.c_str()))
+  if (!kwsys::SystemTools::RemoveFile(testNewLongFile))
     {
     kwsys_ios::cerr
       << "Problem with RemoveFile: "
@@ -208,7 +208,7 @@ static bool CheckFileOperations()
     }
 
   kwsys::SystemTools::Touch(testNewLongFile.c_str(), true);
-  if (!kwsys::SystemTools::RemoveADirectory(testNewLongDir.c_str()))
+  if (!kwsys::SystemTools::RemoveADirectory(testNewLongDir))
     {
     kwsys_ios::cerr
       << "Problem with RemoveADirectory for: "
@@ -507,34 +507,12 @@ static bool CheckStringOperations()
     res = false;    
     }
 
-  int targc;
-  char **targv;
-  kwsys::SystemTools::ConvertWindowsCommandLineToUnixArguments
-    ("\"Local Mojo\\Voodoo.asp\" -CastHex \"D:\\My Secret Mojo\\Voodoo.mp3\"",
-    &targc, &targv);
-  if (targc != 4 || strcmp(targv[1],"Local Mojo\\Voodoo.asp") ||
-      strcmp(targv[2],"-CastHex") || 
-      strcmp(targv[3],"D:\\My Secret Mojo\\Voodoo.mp3"))
-    {
-    kwsys_ios::cerr
-      << "Problem with ConvertWindowsCommandLineToUnixArguments"
-      << "\'\"Local Mojo\\Voodoo.asp\" "
-      << "-CastHex \"D:\\My Secret Mojo\\Voodoo.mp3\"\'"
-      << kwsys_ios::endl;
-    res = false;    
-    }
-  for (;targc >=0; --targc)
-    {
-    delete [] targv[targc];
-    }
-  delete [] targv;
-
   return res;
 }
 
 //----------------------------------------------------------------------------
 
-static bool CheckPutEnv(const char* env, const char* name, const char* value)
+static bool CheckPutEnv(const kwsys_stl::string& env, const char* name, const char* value)
 {
   if(!kwsys::SystemTools::PutEnv(env))
     {
@@ -584,6 +562,55 @@ static bool CheckEnvironmentOperations()
   return res;
 }
 
+
+static bool CheckRelativePath(
+  const kwsys_stl::string& local,
+  const kwsys_stl::string& remote,
+  const kwsys_stl::string& expected)
+{
+  kwsys_stl::string result = kwsys::SystemTools::RelativePath(local, remote);
+  if(expected != result)
+    {
+    kwsys_ios::cerr << "RelativePath(" << local << ", " << remote
+      << ")  yielded " << result << " instead of " << expected << kwsys_ios::endl;
+    return false;
+    }
+  return true;
+}
+
+static bool CheckRelativePaths()
+{
+  bool res = true;
+  res &= CheckRelativePath("/usr/share", "/bin/bash", "../../bin/bash");
+  res &= CheckRelativePath("/usr/./share/", "/bin/bash", "../../bin/bash");
+  res &= CheckRelativePath("/usr//share/", "/bin/bash", "../../bin/bash");
+  res &= CheckRelativePath("/usr/share/../bin/", "/bin/bash", "../../bin/bash");
+  res &= CheckRelativePath("/usr/share", "/usr/share//bin", "bin");
+  return res;
+}
+
+static bool CheckCollapsePath(
+  const kwsys_stl::string& path,
+  const kwsys_stl::string& expected)
+{
+  kwsys_stl::string result = kwsys::SystemTools::CollapseFullPath(path);
+  if(expected != result)
+    {
+    kwsys_ios::cerr << "CollapseFullPath(" << path
+      << ")  yielded " << result << " instead of " << expected << kwsys_ios::endl;
+    return false;
+    }
+  return true;
+}
+
+static bool CheckCollapsePath()
+{
+  bool res = true;
+  res &= CheckCollapsePath("/usr/share/*", "/usr/share/*");
+  res &= CheckCollapsePath("C:/Windows/*", "C:/Windows/*");
+  return res;
+}
+
 //----------------------------------------------------------------------------
 int testSystemTools(int, char*[])
 {
@@ -614,6 +641,10 @@ int testSystemTools(int, char*[])
   res &= CheckStringOperations();
 
   res &= CheckEnvironmentOperations();
+
+  res &= CheckRelativePaths();
+
+  res &= CheckCollapsePath();
 
   return res ? 0 : 1;
 }

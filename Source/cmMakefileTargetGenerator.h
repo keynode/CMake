@@ -109,7 +109,7 @@ protected:
   void GenerateExtraOutput(const char* out, const char* in,
                            bool symbolic = false);
 
-  void AppendProgress(std::vector<std::string>& commands);
+  void MakeEchoProgress(cmLocalUnixMakefileGenerator3::EchoProgress&) const;
 
   // write out the variable that lists the objects for this target
   void WriteObjectsVariable(std::string& variableName,
@@ -141,15 +141,6 @@ protected:
 
   // Lookup the link rule for this target.
   std::string GetLinkRule(const std::string& linkRuleVar);
-
-  /** In order to support parallel builds for custom commands with
-      multiple outputs the outputs are given a serial order, and only
-      the first output actually has the build rule.  Other outputs
-      just depend on the first one.  The check-build-system step must
-      remove a dependee if the depender is missing to make sure both
-      are regenerated properly.  This method is used by the local
-      makefile generators to register such pairs.  */
-  void AddMultipleOutputPair(const char* depender, const char* dependee);
 
   /** Create a script to hold link rules and a command to invoke the
       script at build time.  */
@@ -230,9 +221,6 @@ protected:
 
   // Set of extra output files to be driven by the build.
   std::set<std::string> ExtraFiles;
-
-  typedef std::map<std::string, std::string> MultipleOutputPairsType;
-  MultipleOutputPairsType MultipleOutputPairs;
 
   // Target name info.
   std::string TargetNameOut;

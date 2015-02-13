@@ -46,7 +46,7 @@ bool cmCTestHandlerCommand
     if(!this->CheckArgumentKeyword(args[i]) &&
        !this->CheckArgumentValue(args[i]))
       {
-      cmOStringStream e;
+      std::ostringstream e;
       e << "called with unknown argument \"" << args[i] << "\".";
       this->SetError(e.str());
       return false;
@@ -137,16 +137,16 @@ bool cmCTestHandlerCommand
     }
   std::string current_dir = cmSystemTools::GetCurrentWorkingDirectory();
   cmSystemTools::ChangeDirectory(
-    this->CTest->GetCTestConfiguration("BuildDirectory").c_str());
+    this->CTest->GetCTestConfiguration("BuildDirectory"));
   int res = handler->ProcessHandler();
   if ( this->Values[ct_RETURN_VALUE] && *this->Values[ct_RETURN_VALUE])
     {
-    cmOStringStream str;
+    std::ostringstream str;
     str << res;
     this->Makefile->AddDefinition(
       this->Values[ct_RETURN_VALUE], str.str().c_str());
     }
-  cmSystemTools::ChangeDirectory(current_dir.c_str());
+  cmSystemTools::ChangeDirectory(current_dir);
   return true;
 }
 
@@ -183,7 +183,7 @@ bool cmCTestHandlerCommand::CheckArgumentValue(std::string const& arg)
     unsigned int k = this->ArgumentIndex;
     if(this->Values[k])
       {
-      cmOStringStream e;
+      std::ostringstream e;
       e << "Called with more than one value for " << this->Arguments[k];
       this->Makefile->IssueMessage(cmake::FATAL_ERROR, e.str());
       this->ArgumentDoing = ArgumentDoingError;

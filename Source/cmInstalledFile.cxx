@@ -77,6 +77,13 @@ void cmInstalledFile::AppendProperty(cmMakefile const* mf,
 }
 
 //----------------------------------------------------------------------------
+bool cmInstalledFile::HasProperty(
+  const std::string& prop) const
+{
+  return this->Properties.find(prop) != this->Properties.end();
+}
+
+//----------------------------------------------------------------------------
 bool cmInstalledFile::GetProperty(
   const std::string& prop, std::string& value) const
 {
@@ -110,4 +117,15 @@ bool cmInstalledFile::GetPropertyAsBool(const std::string& prop) const
   std::string value;
   bool isSet = this->GetProperty(prop, value);
   return isSet && cmSystemTools::IsOn(value.c_str());
+}
+
+//----------------------------------------------------------------------------
+void cmInstalledFile::GetPropertyAsList(const std::string& prop,
+  std::vector<std::string>& list) const
+{
+  std::string value;
+  this->GetProperty(prop, value);
+
+  list.clear();
+  cmSystemTools::ExpandListArgument(value, list);
 }

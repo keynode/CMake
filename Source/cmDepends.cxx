@@ -94,7 +94,7 @@ bool cmDepends::Check(const char *makeFile, const char *internalFile,
     // Get the CWD but do not call CollapseFullPath because
     // we only need it to cd back, and the form does not matter
     oldcwd = cmSystemTools::GetCurrentWorkingDirectory(false);
-    cmSystemTools::ChangeDirectory(this->CompileDirectory.c_str());
+    cmSystemTools::ChangeDirectory(this->CompileDirectory);
     }
 
   // Check whether dependencies must be regenerated.
@@ -111,7 +111,7 @@ bool cmDepends::Check(const char *makeFile, const char *internalFile,
   // Restore working directory.
   if(oldcwd != ".")
     {
-    cmSystemTools::ChangeDirectory(oldcwd.c_str());
+    cmSystemTools::ChangeDirectory(oldcwd);
     }
 
   return okay;
@@ -123,7 +123,7 @@ void cmDepends::Clear(const char *file)
   // Print verbose output.
   if(this->Verbose)
     {
-    cmOStringStream msg;
+    std::ostringstream msg;
     msg << "Clearing dependencies in \"" << file << "\"." << std::endl;
     cmSystemTools::Stdout(msg.str().c_str());
     }
@@ -213,7 +213,7 @@ bool cmDepends::CheckDependencies(std::istream& internalDepends,
       // Print verbose output.
       if(this->Verbose)
         {
-        cmOStringStream msg;
+        std::ostringstream msg;
         msg << "Dependee \"" << dependee
             << "\" does not exist for depender \""
             << depender << "\"." << std::endl;
@@ -235,7 +235,7 @@ bool cmDepends::CheckDependencies(std::istream& internalDepends,
           // Print verbose output.
           if(this->Verbose)
             {
-            cmOStringStream msg;
+            std::ostringstream msg;
             msg << "Dependee \"" << dependee
                 << "\" is newer than depender \""
                 << depender << "\"." << std::endl;
@@ -257,7 +257,7 @@ bool cmDepends::CheckDependencies(std::istream& internalDepends,
           // Print verbose output.
           if(this->Verbose)
             {
-            cmOStringStream msg;
+            std::ostringstream msg;
             msg << "Dependee \"" << dependee
                 << "\" is newer than depends file \""
                 << internalDependsFileName << "\"." << std::endl;

@@ -196,9 +196,30 @@ void cmIDEOptions::AddFlag(const char* flag,
 }
 
 //----------------------------------------------------------------------------
+void cmIDEOptions::AppendFlag(std::string const& flag,
+                              std::string const& value)
+{
+  this->FlagMap[flag].push_back(value);
+}
+
+//----------------------------------------------------------------------------
+void cmIDEOptions::AppendFlag(std::string const& flag,
+                              std::vector<std::string> const& value)
+{
+  FlagValue& fv = this->FlagMap[flag];
+  std::copy(value.begin(), value.end(), std::back_inserter(fv));
+}
+
+//----------------------------------------------------------------------------
 void cmIDEOptions::RemoveFlag(const char* flag)
 {
   this->FlagMap.erase(flag);
+}
+
+//----------------------------------------------------------------------------
+bool cmIDEOptions::HasFlag(std::string const& flag) const
+{
+  return this->FlagMap.find(flag) != this->FlagMap.end();
 }
 
 //----------------------------------------------------------------------------

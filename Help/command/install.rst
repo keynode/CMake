@@ -159,6 +159,10 @@ file itself, call ``install(EXPORT)``, documented below.
 Installing a target with the :prop_tgt:`EXCLUDE_FROM_ALL` target property
 set to ``TRUE`` has undefined behavior.
 
+The install destination given to the target install ``DESTINATION`` may
+use "generator expressions" with the syntax ``$<...>``.  See the
+:manual:`cmake-generator-expressions(7)` manual for available expressions.
+
 Installing Files
 ^^^^^^^^^^^^^^^^
 
@@ -268,7 +272,8 @@ Custom Installation Logic
 
 ::
 
-  install([[SCRIPT <file>] [CODE <code>]] [...])
+  install([[SCRIPT <file>] [CODE <code>]]
+          [COMPONENT <component>] [...])
 
 The ``SCRIPT`` form will invoke the given CMake script files during
 installation.  If the script file name is a relative path it will be

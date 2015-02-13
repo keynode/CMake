@@ -19,7 +19,6 @@
 #include "CTest/cmCTestScriptHandler.h"
 #include "CTest/cmCTestLaunch.h"
 #include "cmsys/Encoding.hxx"
-#include <locale.h>
 
 //----------------------------------------------------------------------------
 static const char * cmDocumentationName[][2] =
@@ -48,7 +47,7 @@ static const char * cmDocumentationOptions[][2] =
   {"--output-on-failure", "Output anything outputted by the test program "
     "if the test should fail."},
   {"-F", "Enable failover."},
-  {"-j <jobs>, --parallel <jobs>", "Run the tests in parallel using the"
+  {"-j <jobs>, --parallel <jobs>", "Run the tests in parallel using the "
    "given number of jobs."},
   {"-Q,--quiet", "Make ctest quiet."},
   {"-O <file>, --output-log <file>", "Output to log file"},
@@ -86,6 +85,7 @@ static const char * cmDocumentationOptions[][2] =
   {"--build-two-config", "Run CMake twice"},
   {"--build-exe-dir", "Specify the directory for the executable."},
   {"--build-generator", "Specify the generator to use."},
+  {"--build-generator-platform", "Specify the generator-specific platform."},
   {"--build-generator-toolset", "Specify the generator-specific toolset."},
   {"--build-project", "Specify the name of the project to build."},
   {"--build-makeprogram", "Specify the make program to use."},
@@ -98,7 +98,7 @@ static const char * cmDocumentationOptions[][2] =
   {"--test-timeout", "The time limit in seconds, internal use only."},
   {"--tomorrow-tag", "Nightly or experimental starts with next day tag."},
   {"--ctest-config", "The configuration file used to initialize CTest state "
-  "when submitting dashboards."},
+   "when submitting dashboards."},
   {"--overwrite", "Overwrite CTest configuration option."},
   {"--extra-submit <file>[;<file>]", "Submit extra files to the dashboard."},
   {"--force-new-ctest-process", "Run child CTest instances as new processes"},
@@ -116,8 +116,6 @@ static const char * cmDocumentationOptions[][2] =
 // this is a test driver program for cmCTest.
 int main (int argc, char const* const* argv)
 {
-  setlocale(LC_CTYPE, "");
-
   cmsys::Encoding::CommandLineArguments encoding_args =
     cmsys::Encoding::CommandLineArguments::Main(argc, argv);
   argc = encoding_args.argc();
@@ -135,7 +133,7 @@ int main (int argc, char const* const* argv)
 
   cmCTest inst;
 
-  if ( cmSystemTools::GetCurrentWorkingDirectory().size() == 0 )
+  if (cmSystemTools::GetCurrentWorkingDirectory().empty())
     {
     cmCTestLog(&inst, ERROR_MESSAGE,
       "Current working directory cannot be established." << std::endl);

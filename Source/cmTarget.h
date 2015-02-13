@@ -202,7 +202,7 @@ public:
     PlainTLLSignature
   };
   bool PushTLLCommandTrace(TLLSignature signature);
-  void GetTllSignatureTraces(cmOStringStream &s, TLLSignature sig) const;
+  void GetTllSignatureTraces(std::ostringstream &s, TLLSignature sig) const;
 
   void MergeLinkLibraries( cmMakefile& mf, const std::string& selfname,
                            const LinkLibraryVectorType& libs );
@@ -755,6 +755,7 @@ private:
   mutable cmPropertyMap Properties;
   LinkLibraryVectorType OriginalLinkLibraries;
   bool DLLPlatform;
+  bool IsAndroid;
   bool IsApple;
   bool IsImportedTarget;
   mutable bool DebugIncludesDone;

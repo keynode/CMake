@@ -123,3 +123,88 @@ if(expected_file_mask)
     message(FATAL_ERROR "error: expected_count=${expected_count} does not match actual_count=${actual_count}: CPackComponents test fails. (CPack_output=${CPack_output}, CPack_error=${CPack_error})")
   endif()
 endif()
+
+# Validate content
+if(CPackGen MATCHES "RPM")
+  find_program(RPM_EXECUTABLE rpm)
+  if(NOT RPM_EXECUTABLE)
+    message(FATAL_ERROR "error: missing rpm executable required by the test")
+  endif()
+
+  set(CPACK_RPM_PACKAGE_SUMMARY "default summary")
+  set(CPACK_RPM_libraries_PACKAGE_SUMMARY "libraries summary")
+  set(CPACK_RPM_libraries_PACKAGE_DESCRIPTION "libraries description")
+  set(CPACK_COMPONENT_APPLICATIONS_DESCRIPTION
+    "An extremely useful application that makes use of MyLib")
+  set(CPACK_COMPONENT_HEADERS_DESCRIPTION
+    "C/C\\+\\+ header files for use with MyLib")
+
+  if(${CPackComponentWay} STREQUAL "IgnoreGroup")
+    # set gnu install prefixes to what they are set during rpm creation
+    # CMAKE_SIZEOF_VOID_P is not set here but lib is prefix of lib64 so
+    # relocation path test won't fail on OSes with lib64 library location
+    include(GNUInstallDirs)
+    set(CPACK_PACKAGING_INSTALL_PREFIX "/usr")
+
+    foreach(check_file ${expected_file})
+      string(REGEX MATCH ".*libraries.*" check_file_libraries_match ${check_file})
+      string(REGEX MATCH ".*headers.*" check_file_headers_match ${check_file})
+      string(REGEX MATCH ".*applications.*" check_file_applications_match ${check_file})
+      string(REGEX MATCH ".*Unspecified.*" check_file_Unspecified_match ${check_file})
+
+      execute_process(COMMAND ${RPM_EXECUTABLE} -pqi ${check_file}
+          OUTPUT_VARIABLE check_file_content
+          ERROR_QUIET
+          OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+      if(check_file_libraries_match)
+        set(check_file_match_expected_summary ".*${CPACK_RPM_libraries_PACKAGE_SUMMARY}.*")
+        set(check_file_match_expected_description ".*${CPACK_RPM_libraries_PACKAGE_DESCRIPTION}.*")
+        set(check_file_match_expected_relocation_path "Relocations : ${CPACK_PACKAGING_INSTALL_PREFIX} ${CPACK_PACKAGING_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+        set(spec_regex "*libraries*")
+      elseif(check_file_headers_match)
+        set(check_file_match_expected_summary ".*${CPACK_RPM_PACKAGE_SUMMARY}.*")
+        set(check_file_match_expected_description ".*${CPACK_COMPONENT_HEADERS_DESCRIPTION}.*")
+        set(check_file_match_expected_relocation_path "Relocations : ${CPACK_PACKAGING_INSTALL_PREFIX} ${CPACK_PACKAGING_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}")
+        set(spec_regex "*headers*")
+      elseif(check_file_applications_match)
+        set(check_file_match_expected_summary ".*${CPACK_RPM_PACKAGE_SUMMARY}.*")
+        set(check_file_match_expected_description ".*${CPACK_COMPONENT_APPLICATIONS_DESCRIPTION}.*")
+        set(check_file_match_expected_relocation_path "Relocations : ${CPACK_PACKAGING_INSTALL_PREFIX} ${CPACK_PACKAGING_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}")
+        set(spec_regex "*applications*")
+      elseif(check_file_Unspecified_match)
+        set(check_file_match_expected_summary ".*${CPACK_RPM_PACKAGE_SUMMARY}.*")
+        set(check_file_match_expected_description ".*DESCRIPTION.*")
+        set(check_file_match_expected_relocation_path "Relocations : ${CPACK_PACKAGING_INSTALL_PREFIX} ${CPACK_PACKAGING_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}")
+        set(spec_regex "*Unspecified*")
+      else()
+        message(FATAL_ERROR "error: unexpected rpm package '${check_file}'")
+      endif()
+
+      string(REGEX MATCH ${check_file_match_expected_summary} check_file_match_summary ${check_file_content})
+
+      if(NOT check_file_match_summary)
+        message(FATAL_ERROR "error: '${check_file}' rpm package summary does not match expected value - regex '${check_file_match_expected_summary}'; RPM output: '${check_file_content}'")
+      endif()
+
+      string(REGEX MATCH ${check_file_match_expected_description} check_file_match_description ${check_file_content})
+
+      if(NOT check_file_match_description)
+        message(FATAL_ERROR "error: '${check_file}' rpm package description does not match expected value - regex '${check_file_match_expected_description}'; RPM output: '${check_file_content}'")
+      endif()
+
+      string(REGEX MATCH ${check_file_match_expected_relocation_path} check_file_match_relocation_path ${check_file_content})
+
+      if(NOT check_file_match_relocation_path)
+        file(GLOB_RECURSE spec_file "${CPackComponentsForAll_BINARY_DIR}/${spec_regex}.spec")
+
+        if(spec_file)
+          file(READ ${spec_file} spec_file_content)
+        endif()
+
+        message(FATAL_ERROR "error: '${check_file}' rpm package relocation path does not match expected value - regex '${check_file_match_expected_relocation_path}'; RPM output: '${check_file_content}'; generated spec file: '${spec_file_content}'")
+      endif()
+    endforeach()
+  elseif(${CPackComponentWay} STREQUAL "IgnoreGroup")
+  endif()
+endif()

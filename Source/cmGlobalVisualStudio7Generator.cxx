@@ -23,14 +23,15 @@ cmGlobalVisualStudio7Generator::cmGlobalVisualStudio7Generator(
 {
   this->IntelProjectVersion = 0;
   this->DevEnvCommandInitialized = false;
+  this->MasmEnabled = false;
 
   if (platformName.empty())
     {
-    this->PlatformName = "Win32";
+    this->DefaultPlatformName = "Win32";
     }
   else
     {
-    this->PlatformName = platformName;
+    this->DefaultPlatformName = platformName;
     }
 }
 
@@ -259,21 +260,38 @@ cmLocalGenerator *cmGlobalVisualStudio7Generator::CreateLocalGenerator()
 }
 
 //----------------------------------------------------------------------------
+std::string const& cmGlobalVisualStudio7Generator::GetPlatformName() const
+{
+  if(!this->GeneratorPlatform.empty())
+    {
+    return this->GeneratorPlatform;
+    }
+  return this->DefaultPlatformName;
+}
+
+//----------------------------------------------------------------------------
 bool cmGlobalVisualStudio7Generator::SetSystemName(std::string const& s,
                                                    cmMakefile* mf)
 {
-  if(this->PlatformName == "x64")
+  mf->AddDefinition("CMAKE_VS_INTEL_Fortran_PROJECT_VERSION",
+                    this->GetIntelProjectVersion());
+  return this->cmGlobalVisualStudioGenerator::SetSystemName(s, mf);
+}
+
+//----------------------------------------------------------------------------
+bool cmGlobalVisualStudio7Generator::SetGeneratorPlatform(std::string const& p,
+                                                          cmMakefile* mf)
+{
+  if(this->GetPlatformName() == "x64")
     {
     mf->AddDefinition("CMAKE_FORCE_WIN64", "TRUE");
     }
-  else if(this->PlatformName == "Itanium")
+  else if(this->GetPlatformName() == "Itanium")
     {
     mf->AddDefinition("CMAKE_FORCE_IA64", "TRUE");
     }
   mf->AddDefinition("CMAKE_VS_PLATFORM_NAME", this->GetPlatformName().c_str());
-  mf->AddDefinition("CMAKE_VS_INTEL_Fortran_PROJECT_VERSION",
-                    this->GetIntelProjectVersion());
-  return this->cmGlobalVisualStudioGenerator::SetSystemName(s, mf);
+  return this->cmGlobalVisualStudioGenerator::SetGeneratorPlatform(p, mf);
 }
 
 void cmGlobalVisualStudio7Generator::GenerateConfigurations(cmMakefile* mf)
@@ -540,6 +558,11 @@ void cmGlobalVisualStudio7Generator
                cmLocalGenerator* root,
                std::vector<cmLocalGenerator*>& generators)
 {
+#ifdef CMAKE_ENCODING_UTF8
+  // Add UTF-8 BOM for .sln file to indicate encoding
+  const unsigned char utf8_bom[3] = {0xEF,0xBB,0xBF};
+  fout.write(reinterpret_cast<const char*>(utf8_bom), 3);
+#endif
   // Write out the header for a SLN file
   this->WriteSLNHeader(fout);
 

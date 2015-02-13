@@ -14,17 +14,19 @@
 # Overview
 # ^^^^^^^^
 #
-# CPack ``IFW`` generator helps you create online and offline
+# CPack ``IFW`` generator helps you to create online and offline
 # binary cross-platform installers with a graphical user interface.
 #
-# CPack IFW generator prepare project installation and generate configuration
+# CPack IFW generator prepares project installation and generates configuration
 # and meta information for QtIFW_ tools.
 #
 # The QtIFW_ provides a set of tools and utilities to create
 # installers for the supported desktop Qt platforms: Linux, Microsoft Windows,
 # and Mac OS X.
 #
-# To use CPack ``IFW`` generator you must also install QtIFW_.
+# You should also install QtIFW_ to use CPack ``IFW`` generator.
+# If you don't use a default path for the installation, please set
+# the used path in the variable ``QTIFWDIR``.
 #
 # Variables
 # ^^^^^^^^^
@@ -59,7 +61,7 @@
 #
 # .. variable:: CPACK_IFW_PACKAGE_LOGO
 #
-#  Filename for a logo used as QWizard::LogoPixmap.
+#  Filename for a logo is used as QWizard::LogoPixmap.
 #
 # .. variable:: CPACK_IFW_TARGET_DIRECTORY
 #
@@ -74,6 +76,28 @@
 #
 #  You can use predefined variables.
 #
+# .. variable:: CPACK_IFW_PACKAGE_GROUP
+#
+#  The group, which will be used to configure the root package
+#
+# .. variable:: CPACK_IFW_PACKAGE_NAME
+#
+#  The root package name, which will be used if configuration group is not
+#  specified
+#
+# .. variable:: CPACK_IFW_REPOSITORIES_ALL
+#
+#  The list of remote repositories.
+#
+#  The default value of this variable is computed by CPack and contains
+#  all repositories added with command :command:`cpack_ifw_add_repository`
+#
+# .. variable:: CPACK_IFW_DOWNLOAD_ALL
+#
+#  If this is ``ON`` all components will be downloaded.
+#  By default is ``OFF`` or used value
+#  from ``CPACK_DOWNLOAD_ALL`` if set
+#
 # Components
 # """"""""""
 #
@@ -86,7 +110,7 @@
 #  Additional prepared packages dirs that will be used to resolve
 #  dependent components.
 #
-# Advanced
+# Tools
 # """"""""
 #
 # .. variable:: CPACK_IFW_BINARYCREATOR_EXECUTABLE
@@ -95,19 +119,11 @@
 #
 #  This variable is cached and can be configured user if need.
 #
-# .. variable:: CPACK_IFW_BINARYCREATOR_EXECUTABLE_FOUND
-#
-#  True if the "binarycreator" command line client was found.
-#
 # .. variable:: CPACK_IFW_REPOGEN_EXECUTABLE
 #
 #  The path to "repogen" command line client.
 #
 #  This variable is cached and can be configured user if need.
-#
-# .. variable:: CPACK_IFW_REPOGEN_EXECUTABLE_FOUND
-#
-#  True if the "repogen" command line client was found.
 #
 # Commands
 # ^^^^^^^^^
@@ -122,19 +138,23 @@
 #
 # ::
 #
-#   cpack_ifw_configure_component(<compname>
+#   cpack_ifw_configure_component(<compname> [COMMON]
+#                       [NAME <name>]
 #                       [VERSION <version>]
 #                       [SCRIPT <script>]
-#                       [NAME <name>]
 #                       [PRIORITY <priority>]
 #                       [DEPENDS <com_id> ...]
 #                       [LICENSES <display_name> <file_path> ...])
 #
 # This command should be called after cpack_add_component command.
 #
-# ``VERSION`` is version of component. By default used :variable:`CPACK_PACKAGE_VERSION`.
+# ``COMMON`` if set, then the component will be packaged and installed as part
+# of a group to which it belongs.
 #
-# ``SCRIPT`` is relative or absolute path to operations script
+# ``VERSION`` is version of component.
+# By default used :variable:`CPACK_PACKAGE_VERSION`.
+#
+# ``SCRIPT`` is a relative or absolute path to operations script
 # for this component.
 #
 # ``NAME`` is used to create domain-like identification for this component.
@@ -158,20 +178,52 @@
 #   cpack_ifw_configure_component_group(<grpname>
 #                       [VERSION <version>]
 #                       [NAME <name>]
+#                       [SCRIPT <script>]
 #                       [PRIORITY <priority>]
 #                       [LICENSES <display_name> <file_path> ...])
 #
 # This command should be called after cpack_add_component_group command.
 #
-# ``VERSION`` is version of component group. By default used :variable:`CPACK_PACKAGE_VERSION`.
+# ``VERSION`` is version of component group.
+# By default used :variable:`CPACK_PACKAGE_VERSION`.
 #
 # ``NAME`` is used to create domain-like identification for this component group.
 # By default used origin component group name.
+#
+# ``SCRIPT`` is a relative or absolute path to operations script
+# for this component group.
 #
 # ``PRIORITY`` is priority of the component group in the tree.
 #
 # ``LICENSES`` pair of <display_name> and <file_path> of license text for this
 # component group. You can specify more then one license.
+#
+# --------------------------------------------------------------------------
+#
+# .. command:: cpack_ifw_add_repository
+#
+# Add QtIFW_ specific remote repository.
+#
+# ::
+#
+#   cpack_ifw_add_repository(<reponame> [DISABLED]
+#                       URL <url>
+#                       [USERNAME <username>]
+#                       [PASSWORD <password>]
+#                       [DISPLAY_NAME <display_name>])
+#
+# This macro will also add the <reponame> repository
+# to a variable :variable:`CPACK_IFW_REPOSITORIES_ALL`
+#
+# ``DISABLED`` if set, then the repository will be disabled by default.
+#
+# ``URL`` is points to a list of available components.
+#
+# ``USERNAME`` is used as user on a protected repository.
+#
+# ``PASSWORD`` is password to use on a protected repository.
+#
+# ``DISPLAY_NAME`` is string to display instead of the URL.
 #
 # Example usage
 # ^^^^^^^^^^^^^
@@ -180,7 +232,7 @@
 #
 #    set(CPACK_PACKAGE_NAME "MyPackage")
 #    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "MyPackage Installation Example")
-#    set(CPACK_PACKAGE_VERSION "1.0.0")
+#    set(CPACK_PACKAGE_VERSION "1.0.0") # Version of installer
 #
 #    include(CPack)
 #    include(CPackIFW)
@@ -189,14 +241,21 @@
 #        DISPLAY_NAME "MyApp"
 #        DESCRIPTION "My Application")
 #    cpack_ifw_configure_component(myapp
-#        VERSION "1.2.3"
+#        VERSION "1.2.3" # Version of component
 #        SCRIPT "operations.qs")
+#    cpack_add_component(mybigplugin
+#        DISPLAY_NAME "MyBigPlugin"
+#        DESCRIPTION "My Big Downloadable Plugin"
+#        DOWNLOADED)
+#    cpack_ifw_add_repository(myrepo
+#        URL "http://example.com/ifw/repo/myapp"
+#        DISPLAY_NAME "My Application Repository")
 #
 #
 # Online installer
 # ^^^^^^^^^^^^^^^^
 #
-# By defaul CPack IFW generator make offline installer. This means that all
+# By default CPack IFW generator makes offline installer. This means that all
 # components will be packaged into a binary file.
 #
 # To make a component downloaded, you must set the ``DOWNLOADED`` option in
@@ -205,8 +264,11 @@
 # Then you would use the command :command:`cpack_configure_downloads`.
 # If you set ``ALL`` option all components will be downloaded.
 #
-# CPack IFW generator create "repository" dir in current binary dir. You
-# would copy content of this dir to specified ``site``.
+# You also can use command :command:`cpack_ifw_add_repository` and
+# variable :variable:`CPACK_IFW_DOWNLOAD_ALL` for more specific configuration.
+#
+# CPack IFW generator creates "repository" dir in current binary dir. You
+# would copy content of this dir to specified ``site`` (``url``).
 #
 # See Also
 # ^^^^^^^^
@@ -246,47 +308,40 @@
 
 # Default path
 
+set(_CPACK_IFW_PATHS
+  "${QTIFWDIR}"
+  "$ENV{QTIFWDIR}"
+  "${QTDIR}"
+  "$ENV{QTIFWDIR}")
 if(WIN32)
-        set(_CPACK_IFW_PATHS
-            "$ENV{HOMEDRIVE}/Qt"
-            "C:/Qt"
-        )
+  list(APPEND _CPACK_IFW_PATHS
+    "$ENV{HOMEDRIVE}/Qt"
+    "C:/Qt")
 else()
-        set(_CPACK_IFW_PATHS
-            "$ENV{HOME}/Qt"
-            "/opt/Qt"
-        )
+  list(APPEND _CPACK_IFW_PATHS
+    "$ENV{HOME}/Qt"
+    "/opt/Qt")
 endif()
 
 set(_CPACK_IFW_SUFFIXES
-        "QtIFW-1.7.0/bin"
-        "QtIFW-1.6.0/bin"
-        "QtIFW-1.5.0/bin"
-        "QtIFW-1.4.0/bin"
-        "QtIFW-1.3.0/bin"
-)
+  "bin"
+  "QtIFW-1.7.0/bin"
+  "QtIFW-1.6.0/bin"
+  "QtIFW-1.5.0/bin"
+  "QtIFW-1.4.0/bin"
+  "QtIFW-1.3.0/bin")
 
 # Look for 'binarycreator'
-
-if(NOT CPACK_IFW_BINARYCREATOR_EXECUTABLE_FOUND)
 
 find_program(CPACK_IFW_BINARYCREATOR_EXECUTABLE
   NAMES binarycreator
   PATHS ${_CPACK_IFW_PATHS}
   PATH_SUFFIXES ${_CPACK_IFW_SUFFIXES}
-  DOC "QtIFW binarycreator command line client"
-  )
+  DOC "QtIFW binarycreator command line client")
+
 mark_as_advanced(CPACK_IFW_BINARYCREATOR_EXECUTABLE)
 
-if(EXISTS ${CPACK_IFW_BINARYCREATOR_EXECUTABLE})
-  set(CPACK_IFW_BINARYCREATOR_EXECUTABLE_FOUND 1)
-endif()
-
-endif() # NOT CPACK_IFW_BINARYCREATOR_EXECUTABLE_FOUND
-
 # Look for 'repogen'
-
-if(NOT CPACK_IFW_REPOGEN_EXECUTABLE_FOUND)
 
 find_program(CPACK_IFW_REPOGEN_EXECUTABLE
   NAMES repogen
@@ -295,12 +350,6 @@ find_program(CPACK_IFW_REPOGEN_EXECUTABLE
   DOC "QtIFW repogen command line client"
   )
 mark_as_advanced(CPACK_IFW_REPOGEN_EXECUTABLE)
-
-if(EXISTS ${CPACK_IFW_REPOGEN_EXECUTABLE})
-  set(CPACK_IFW_REPOGEN_EXECUTABLE_FOUND 1)
-endif()
-
-endif() # NOT CPACK_IFW_REPOGEN_EXECUTABLE_FOUND
 
 #
 ## Next code is included only once
@@ -322,6 +371,20 @@ endif()
 if(NOT __CMAKE_PARSE_ARGUMENTS_INCLUDED)
     include(CMakeParseArguments)
 endif()
+
+# Resolve full filename for script file
+macro(_cpack_ifw_resolve_script _variable)
+  set(_ifw_script_macro ${_variable})
+  set(_ifw_script_file ${${_ifw_script_macro}})
+  if(DEFINED ${_ifw_script_macro})
+    get_filename_component(${_ifw_script_macro} ${_ifw_script_file} ABSOLUTE)
+    set(_ifw_script_file ${${_ifw_script_macro}})
+    if(NOT EXISTS ${_ifw_script_file})
+      message(WARNING "CPack IFW: script file \"${_ifw_script_file}\" is not exists")
+      set(${_ifw_script_macro})
+    endif()
+  endif()
+endmacro()
 
 # Resolve full path to lisense file
 macro(_cpack_ifw_resolve_lisenses _variable)
@@ -346,26 +409,21 @@ macro(cpack_ifw_configure_component compname)
 
   string(TOUPPER ${compname} _CPACK_IFWCOMP_UNAME)
 
-  set(_IFW_OPT)
+  set(_IFW_OPT COMMON)
   set(_IFW_ARGS VERSION SCRIPT NAME PRIORITY)
   set(_IFW_MULTI_ARGS DEPENDS LICENSES)
   cmake_parse_arguments(CPACK_IFW_COMPONENT_${_CPACK_IFWCOMP_UNAME} "${_IFW_OPT}" "${_IFW_ARGS}" "${_IFW_MULTI_ARGS}" ${ARGN})
 
-  # Resolve full filename for script file
-  set(_IFW_SCRIPT_MACRO CPACK_IFW_COMPONENT_${_CPACK_IFWCOMP_UNAME}_SCRIPT)
-  set(_IFW_SCRIPT_FILE ${${_IFW_SCRIPT_MACRO}})
-  if(DEFINED ${_IFW_SCRIPT_MACRO})
-    get_filename_component(${_IFW_SCRIPT_MACRO} ${_IFW_SCRIPT_FILE} ABSOLUTE)
-    set(_IFW_SCRIPT_FILE ${${_IFW_SCRIPT_MACRO}})
-    if(NOT EXISTS ${_IFW_SCRIPT_FILE})
-        message(WARNING "CPack IFW: script file \"${_IFW_SCRIPT_FILE}\" for component \"${compname}\" is not exists" )
-        set(${_IFW_SCRIPT_MACRO})
-    endif()
-  endif()
-
+  _cpack_ifw_resolve_script(CPACK_IFW_COMPONENT_${_CPACK_IFWCOMP_UNAME}_SCRIPT)
   _cpack_ifw_resolve_lisenses(CPACK_IFW_COMPONENT_${_CPACK_IFWCOMP_UNAME}_LICENSES)
 
   set(_CPACK_IFWCOMP_STR "\n# Configuration for IFW component \"${compname}\"\n")
+
+  foreach(_IFW_ARG_NAME ${_IFW_OPT})
+  cpack_append_option_set_command(
+    CPACK_IFW_COMPONENT_${_CPACK_IFWCOMP_UNAME}_${_IFW_ARG_NAME}
+    _CPACK_IFWCOMP_STR)
+  endforeach()
 
   foreach(_IFW_ARG_NAME ${_IFW_ARGS})
   cpack_append_string_variable_set_command(
@@ -391,10 +449,11 @@ macro(cpack_ifw_configure_component_group grpname)
   string(TOUPPER ${grpname} _CPACK_IFWGRP_UNAME)
 
   set(_IFW_OPT)
-  set(_IFW_ARGS VERSION NAME PRIORITY)
+  set(_IFW_ARGS NAME VERSION SCRIPT PRIORITY)
   set(_IFW_MULTI_ARGS LICENSES)
   cmake_parse_arguments(CPACK_IFW_COMPONENT_GROUP_${_CPACK_IFWGRP_UNAME} "${_IFW_OPT}" "${_IFW_ARGS}" "${_IFW_MULTI_ARGS}" ${ARGN})
 
+  _cpack_ifw_resolve_script(CPACK_IFW_COMPONENT_GROUP_${_CPACK_IFWGRP_UNAME}_SCRIPT)
   _cpack_ifw_resolve_lisenses(CPACK_IFW_COMPONENT_GROUP_${_CPACK_IFWGRP_UNAME}_LICENSES)
 
   set(_CPACK_IFWGRP_STR "\n# Configuration for IFW component group \"${grpname}\"\n")
@@ -414,6 +473,45 @@ macro(cpack_ifw_configure_component_group grpname)
   if(CPack_CMake_INCLUDED)
     file(APPEND "${CPACK_OUTPUT_CONFIG_FILE}" "${_CPACK_IFWGRP_STR}")
   endif()
+endmacro()
+
+# Macro for adding repository
+macro(cpack_ifw_add_repository reponame)
+
+  string(TOUPPER ${reponame} _CPACK_IFWREPO_UNAME)
+
+  set(_IFW_OPT DISABLED)
+  set(_IFW_ARGS URL USERNAME PASSWORD DISPLAY_NAME)
+  set(_IFW_MULTI_ARGS)
+  cmake_parse_arguments(CPACK_IFW_REPOSITORY_${_CPACK_IFWREPO_UNAME} "${_IFW_OPT}" "${_IFW_ARGS}" "${_IFW_MULTI_ARGS}" ${ARGN})
+
+  set(_CPACK_IFWREPO_STR "\n# Configuration for IFW repository \"${reponame}\"\n")
+
+  foreach(_IFW_ARG_NAME ${_IFW_OPT})
+  cpack_append_option_set_command(
+    CPACK_IFW_REPOSITORY_${_CPACK_IFWREPO_UNAME}_${_IFW_ARG_NAME}
+    _CPACK_IFWREPO_STR)
+  endforeach()
+
+  foreach(_IFW_ARG_NAME ${_IFW_ARGS})
+  cpack_append_string_variable_set_command(
+    CPACK_IFW_REPOSITORY_${_CPACK_IFWREPO_UNAME}_${_IFW_ARG_NAME}
+    _CPACK_IFWREPO_STR)
+  endforeach()
+
+  foreach(_IFW_ARG_NAME ${_IFW_MULTI_ARGS})
+  cpack_append_variable_set_command(
+    CPACK_IFW_REPOSITORY_${_CPACK_IFWREPO_UNAME}_${_IFW_ARG_NAME}
+    _CPACK_IFWREPO_STR)
+  endforeach()
+
+  list(APPEND CPACK_IFW_REPOSITORIES_ALL ${reponame})
+  set(_CPACK_IFWREPO_STR "${_CPACK_IFWREPO_STR}list(APPEND CPACK_IFW_REPOSITORIES_ALL ${reponame})\n")
+
+  if(CPack_CMake_INCLUDED)
+    file(APPEND "${CPACK_OUTPUT_CONFIG_FILE}" "${_CPACK_IFWREPO_STR}")
+  endif()
+
 endmacro()
 
 endif() # NOT CPackIFW_CMake_INCLUDED

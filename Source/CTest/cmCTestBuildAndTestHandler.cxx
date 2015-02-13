@@ -55,20 +55,26 @@ int cmCTestBuildAndTestHandler::ProcessHandler()
 
 //----------------------------------------------------------------------
 int cmCTestBuildAndTestHandler::RunCMake(std::string* outstring,
-  cmOStringStream &out, std::string &cmakeOutString, std::string &cwd,
+  std::ostringstream &out, std::string &cmakeOutString, std::string &cwd,
   cmake *cm)
 {
   unsigned int k;
   std::vector<std::string> args;
   args.push_back(cmSystemTools::GetCMakeCommand());
   args.push_back(this->SourceDir);
-  if(this->BuildGenerator.size())
+  if(!this->BuildGenerator.empty())
     {
     std::string generator = "-G";
     generator += this->BuildGenerator;
     args.push_back(generator);
     }
-  if(this->BuildGeneratorToolset.size())
+  if(!this->BuildGeneratorPlatform.empty())
+    {
+    std::string platform = "-A";
+    platform += this->BuildGeneratorPlatform;
+    args.push_back(platform);
+    }
+  if(!this->BuildGeneratorToolset.empty())
     {
     std::string toolset = "-T";
     toolset += this->BuildGeneratorToolset;
@@ -76,7 +82,7 @@ int cmCTestBuildAndTestHandler::RunCMake(std::string* outstring,
     }
 
   const char* config = 0;
-  if ( this->CTest->GetConfigType().size() > 0 )
+  if (!this->CTest->GetConfigType().empty())
     {
     config = this->CTest->GetConfigType().c_str();
     }
@@ -103,7 +109,7 @@ int cmCTestBuildAndTestHandler::RunCMake(std::string* outstring,
     out << "Error: cmake execution failed\n";
     out << cmakeOutString << "\n";
     // return to the original directory
-    cmSystemTools::ChangeDirectory(cwd.c_str());
+    cmSystemTools::ChangeDirectory(cwd);
     if(outstring)
       {
       *outstring = out.str();
@@ -122,7 +128,7 @@ int cmCTestBuildAndTestHandler::RunCMake(std::string* outstring,
       out << "Error: cmake execution failed\n";
       out << cmakeOutString << "\n";
       // return to the original directory
-      cmSystemTools::ChangeDirectory(cwd.c_str());
+      cmSystemTools::ChangeDirectory(cwd);
       if(outstring)
         {
         *outstring = out.str();
@@ -187,7 +193,7 @@ public:
 int cmCTestBuildAndTestHandler::RunCMakeAndTest(std::string* outstring)
 {
   // if the generator and make program are not specified then it is an error
-  if (!this->BuildGenerator.size())
+  if (this->BuildGenerator.empty())
     {
     if(outstring)
       {
@@ -203,10 +209,10 @@ int cmCTestBuildAndTestHandler::RunCMakeAndTest(std::string* outstring)
   std::string cmakeOutString;
   cmCTestBuildAndTestCaptureRAII captureRAII(cm, cmakeOutString);
   static_cast<void>(captureRAII);
-  cmOStringStream out;
+  std::ostringstream out;
 
-  if ( this->CTest->GetConfigType().size() == 0 &&
-       this->ConfigSample.size())
+  if ( this->CTest->GetConfigType().empty() &&
+       !this->ConfigSample.empty())
     {
     // use the config sample to set the ConfigType
     std::string fullPath;
@@ -219,7 +225,7 @@ int cmCTestBuildAndTestHandler::RunCMakeAndTest(std::string* outstring)
                                          resultingConfig,
                                          extraPaths,
                                          failed);
-    if (fullPath.size() && resultingConfig.size())
+    if (!fullPath.empty() && !resultingConfig.empty())
       {
       this->CTest->SetConfigType(resultingConfig.c_str());
       }
@@ -235,17 +241,18 @@ int cmCTestBuildAndTestHandler::RunCMakeAndTest(std::string* outstring)
   std::string cwd = cmSystemTools::GetCurrentWorkingDirectory();
   out << "Internal cmake changing into directory: "
     << this->BinaryDir << std::endl;
-  if (!cmSystemTools::FileIsDirectory(this->BinaryDir.c_str()))
+  if (!cmSystemTools::FileIsDirectory(this->BinaryDir))
     {
     cmSystemTools::MakeDirectory(this->BinaryDir.c_str());
     }
-  cmSystemTools::ChangeDirectory(this->BinaryDir.c_str());
+  cmSystemTools::ChangeDirectory(this->BinaryDir);
 
   if(this->BuildNoCMake)
     {
     // Make the generator available for the Build call below.
     cm.SetGlobalGenerator(cm.CreateGlobalGenerator(
                             this->BuildGenerator));
+    cm.SetGeneratorPlatform(this->BuildGeneratorPlatform);
     cm.SetGeneratorToolset(this->BuildGeneratorToolset);
 
     // Load the cache to make CMAKE_MAKE_PROGRAM available.
@@ -262,7 +269,7 @@ int cmCTestBuildAndTestHandler::RunCMakeAndTest(std::string* outstring)
 
   // do the build
   std::vector<std::string>::iterator tarIt;
-  if ( this->BuildTargets.size() == 0 )
+  if (this->BuildTargets.empty())
     {
     this->BuildTargets.push_back("");
     }
@@ -284,7 +291,7 @@ int cmCTestBuildAndTestHandler::RunCMakeAndTest(std::string* outstring)
       }
     std::string output;
     const char* config = 0;
-    if ( this->CTest->GetConfigType().size() > 0 )
+    if (!this->CTest->GetConfigType().empty())
       {
       config = this->CTest->GetConfigType().c_str();
       }
@@ -322,7 +329,7 @@ int cmCTestBuildAndTestHandler::RunCMakeAndTest(std::string* outstring)
     }
 
   // if no test was specified then we are done
-  if (!this->TestCommand.size())
+  if (this->TestCommand.empty())
     {
     return 0;
     }
@@ -333,7 +340,7 @@ int cmCTestBuildAndTestHandler::RunCMakeAndTest(std::string* outstring)
   std::string resultingConfig;
   std::vector<std::string> extraPaths;
   // if this->ExecutableDirectory is set try that as well
-  if (this->ExecutableDirectory.size())
+  if (!this->ExecutableDirectory.empty())
     {
     std::string tempPath = this->ExecutableDirectory;
     tempPath += "/";
@@ -367,7 +374,7 @@ int cmCTestBuildAndTestHandler::RunCMakeAndTest(std::string* outstring)
       cmCTestLog(this->CTest, ERROR_MESSAGE, out.str());
       }
     // return to the original directory
-    cmSystemTools::ChangeDirectory(cwd.c_str());
+    cmSystemTools::ChangeDirectory(cwd);
     return 1;
     }
 
@@ -381,10 +388,10 @@ int cmCTestBuildAndTestHandler::RunCMakeAndTest(std::string* outstring)
   std::string outs;
   int retval = 0;
   // run the test from the this->BuildRunDir if set
-  if(this->BuildRunDir.size())
+  if(!this->BuildRunDir.empty())
     {
     out << "Run test in directory: " << this->BuildRunDir << "\n";
-    cmSystemTools::ChangeDirectory(this->BuildRunDir.c_str());
+    cmSystemTools::ChangeDirectory(this->BuildRunDir);
     }
   out << "Running test command: \"" << fullPath << "\"";
   for(size_t k=0; k < this->TestCommandArgs.size(); ++k)
@@ -446,9 +453,9 @@ int cmCTestBuildAndTestHandler::ProcessCommandLineArguments(
       // dir must exist before CollapseFullPath is called
       cmSystemTools::MakeDirectory(this->BinaryDir.c_str());
       this->BinaryDir
-        = cmSystemTools::CollapseFullPath(this->BinaryDir.c_str());
+        = cmSystemTools::CollapseFullPath(this->BinaryDir);
       this->SourceDir
-        = cmSystemTools::CollapseFullPath(this->SourceDir.c_str());
+        = cmSystemTools::CollapseFullPath(this->SourceDir);
       }
     else
       {
@@ -489,6 +496,12 @@ int cmCTestBuildAndTestHandler::ProcessCommandLineArguments(
     {
     idx++;
     this->BuildGenerator = allArgs[idx];
+    }
+  if(currentArg == "--build-generator-platform" &&
+     idx < allArgs.size() - 1)
+    {
+    idx++;
+    this->BuildGeneratorPlatform = allArgs[idx];
     }
   if(currentArg == "--build-generator-toolset" &&
      idx < allArgs.size() - 1)

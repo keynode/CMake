@@ -226,13 +226,7 @@ cmLinkImplItem cmTargetInternals::TargetPropertyEntry::NoLinkImplItem;
 static void deleteAndClear(
       std::vector<cmTargetInternals::TargetPropertyEntry*> &entries)
 {
-  for (std::vector<cmTargetInternals::TargetPropertyEntry*>::const_iterator
-      it = entries.begin(),
-      end = entries.end();
-      it != end; ++it)
-    {
-      delete *it;
-    }
+  cmDeleteAll(entries);
   entries.clear();
 }
 
@@ -257,6 +251,7 @@ cmTarget::cmTarget()
 #endif
   this->HaveInstallRule = false;
   this->DLLPlatform = false;
+  this->IsAndroid = false;
   this->IsApple = false;
   this->IsImportedTarget = false;
   this->BuildInterfaceIncludesAppended = false;
@@ -312,12 +307,19 @@ void cmTarget::SetMakefile(cmMakefile* mf)
                        this->Makefile->IsOn("CYGWIN") ||
                        this->Makefile->IsOn("MINGW"));
 
+  // Check whether we are targeting an Android platform.
+  this->IsAndroid =
+    strcmp(this->Makefile->GetSafeDefinition("CMAKE_SYSTEM_NAME"),
+           "Android") == 0;
+
   // Check whether we are targeting an Apple platform.
   this->IsApple = this->Makefile->IsOn("APPLE");
 
   // Setup default property values.
   if (this->GetType() != INTERFACE_LIBRARY && this->GetType() != UTILITY)
     {
+    this->SetPropertyDefault("ANDROID_API", 0);
+    this->SetPropertyDefault("ANDROID_API_MIN", 0);
     this->SetPropertyDefault("INSTALL_NAME_DIR", 0);
     this->SetPropertyDefault("INSTALL_RPATH", "");
     this->SetPropertyDefault("INSTALL_RPATH_USE_LINK_PATH", "OFF");
@@ -416,12 +418,8 @@ void cmTarget::SetMakefile(cmMakefile* mf)
     const std::set<std::string> parentSystemIncludes =
                                 this->Makefile->GetSystemIncludeDirectories();
 
-    for (std::set<std::string>::const_iterator it
-          = parentSystemIncludes.begin();
-          it != parentSystemIncludes.end(); ++it)
-      {
-      this->SystemIncludeDirectories.insert(*it);
-      }
+    this->SystemIncludeDirectories.insert(parentSystemIncludes.begin(),
+                                          parentSystemIncludes.end());
 
     const std::vector<cmValueWithOrigin> parentOptions =
                                 this->Makefile->GetCompileOptionsEntries();
@@ -440,6 +438,10 @@ void cmTarget::SetMakefile(cmMakefile* mf)
     this->SetPropertyDefault("VISIBILITY_INLINES_HIDDEN", 0);
     }
 
+  if(this->TargetTypeValue == cmTarget::EXECUTABLE)
+    {
+    this->SetPropertyDefault("ANDROID_GUI", 0);
+    }
   if(this->TargetTypeValue == cmTarget::SHARED_LIBRARY
       || this->TargetTypeValue == cmTarget::MODULE_LIBRARY)
     {
@@ -536,12 +538,8 @@ void cmTarget::ClearLinkMaps()
   this->Internal->LinkInterfaceMap.clear();
   this->Internal->LinkInterfaceUsageRequirementsOnlyMap.clear();
   this->Internal->LinkClosureMap.clear();
-  for (cmTargetLinkInformationMap::const_iterator it
-      = this->LinkInformation.begin();
-      it != this->LinkInformation.end(); ++it)
-    {
-    delete it->second;
-    }
+  this->Internal->SourceFilesMap.clear();
+  cmDeleteAll(this->LinkInformation);
   this->LinkInformation.clear();
 }
 
@@ -638,6 +636,8 @@ static bool processSources(cmTarget const* tgt,
   for (std::vector<cmTargetInternals::TargetPropertyEntry*>::const_iterator
       it = entries.begin(), end = entries.end(); it != end; ++it)
     {
+    cmLinkImplItem const& item = (*it)->LinkImplItem;
+    std::string const& targetName = item;
     std::vector<std::string> entrySources;
     cmSystemTools::ExpandListArgument((*it)->ge->Evaluate(mf,
                                               config,
@@ -656,11 +656,10 @@ static bool processSources(cmTarget const* tgt,
         i != entrySources.end(); ++i)
       {
       std::string& src = *i;
-
       cmSourceFile* sf = mf->GetOrCreateSource(src);
       std::string e;
-      src = sf->GetFullPath(&e);
-      if(src.empty())
+      std::string fullPath = sf->GetFullPath(&e);
+      if(fullPath.empty())
         {
         if(!e.empty())
           {
@@ -670,6 +669,25 @@ static bool processSources(cmTarget const* tgt,
           }
         return contextDependent;
         }
+
+      if (!targetName.empty() && !cmSystemTools::FileIsFullPath(src.c_str()))
+        {
+        std::ostringstream err;
+        if (!targetName.empty())
+          {
+          err << "Target \"" << targetName << "\" contains relative "
+            "path in its INTERFACE_SOURCES:\n"
+            "  \"" << src << "\"";
+          }
+        else
+          {
+          err << "Found relative path while evaluating sources of "
+          "\"" << tgt->GetName() << "\":\n  \"" << src << "\"\n";
+          }
+        tgt->GetMakefile()->IssueMessage(cmake::FATAL_ERROR, err.str());
+        return contextDependent;
+        }
+      src = fullPath;
       }
     std::string usedSources;
     for(std::vector<std::string>::iterator
@@ -831,7 +849,7 @@ cmTarget::GetConfigCommonSourceFiles(std::vector<cmSourceFile*>& files) const
         thisConfigFiles += (*fi)->GetFullPath();
         sep = "\n  ";
         }
-      cmOStringStream e;
+      std::ostringstream e;
       e << "Target \"" << this->Name << "\" has source files which vary by "
         "configuration. This is not supported by the \""
         << this->Makefile->GetLocalGenerator()
@@ -891,16 +909,7 @@ void cmTarget::GetSourceFiles(std::vector<cmSourceFile*> &files,
 //----------------------------------------------------------------------------
 void cmTarget::AddTracedSources(std::vector<std::string> const& srcs)
 {
-  std::string srcFiles;
-  const char* sep = "";
-  for(std::vector<std::string>::const_iterator i = srcs.begin();
-      i != srcs.end(); ++i)
-    {
-    std::string filename = *i;
-    srcFiles += sep;
-    srcFiles += filename;
-    sep = ";";
-    }
+  std::string srcFiles = cmJoin(srcs, ";");
   if (!srcFiles.empty())
     {
     this->Internal->SourceFilesMap.clear();
@@ -964,7 +973,7 @@ std::string cmTarget::ProcessSourceItemCMP0049(const std::string& s)
   this->Makefile->ExpandVariablesInString(src);
   if (src != s)
     {
-    cmOStringStream e;
+    std::ostringstream e;
     bool noMessage = false;
     cmake::MessageType messageType = cmake::AUTHOR_WARNING;
     switch(this->Makefile->GetPolicyStatus(cmPolicies::CMP0049))
@@ -1144,15 +1153,11 @@ cmTarget::LinkLibraryType cmTarget::ComputeLinkType(
 
   // Check if any entry in the list matches this configuration.
   std::string configUpper = cmSystemTools::UpperCase(config);
-  for(std::vector<std::string>::const_iterator i = debugConfigs.begin();
-      i != debugConfigs.end(); ++i)
+  if (std::find(debugConfigs.begin(), debugConfigs.end(), configUpper) !=
+      debugConfigs.end())
     {
-    if(*i == configUpper)
-      {
-      return cmTarget::DEBUG;
-      }
+    return cmTarget::DEBUG;
     }
-
   // The current configuration is not a debug configuration.
   return cmTarget::OPTIMIZED;
 }
@@ -1247,7 +1252,7 @@ bool cmTarget::PushTLLCommandTrace(TLLSignature signature)
 }
 
 //----------------------------------------------------------------------------
-void cmTarget::GetTllSignatureTraces(cmOStringStream &s,
+void cmTarget::GetTllSignatureTraces(std::ostringstream &s,
                                      TLLSignature sig) const
 {
   std::vector<cmListFileBacktrace> sigs;
@@ -1275,7 +1280,7 @@ void cmTarget::GetTllSignatureTraces(cmOStringStream &s,
       if(i != it->end())
         {
         cmListFileContext const& lfc = *i;
-        cmOStringStream line;
+        std::ostringstream line;
         line << " * " << (lfc.Line? "": " in ") << lfc << std::endl;
         if (emitted.insert(line.str()).second)
           {
@@ -1365,22 +1370,14 @@ void cmTarget::AddLinkLibrary(cmMakefile& mf,
 void
 cmTarget::AddSystemIncludeDirectories(const std::set<std::string> &incs)
 {
-  for(std::set<std::string>::const_iterator li = incs.begin();
-      li != incs.end(); ++li)
-    {
-    this->SystemIncludeDirectories.insert(*li);
-    }
+  this->SystemIncludeDirectories.insert(incs.begin(), incs.end());
 }
 
 //----------------------------------------------------------------------------
 void
 cmTarget::AddSystemIncludeDirectories(const std::vector<std::string> &incs)
 {
-  for(std::vector<std::string>::const_iterator li = incs.begin();
-      li != incs.end(); ++li)
-    {
-    this->SystemIncludeDirectories.insert(*li);
-    }
+  this->SystemIncludeDirectories.insert(incs.begin(), incs.end());
 }
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
@@ -1507,7 +1504,7 @@ cmTarget::AnalyzeLibDependenciesForVS6( const cmMakefile& mf )
    {
    // skip zero size library entries, this may happen
    // if a variable expands to nothing.
-   if (lib->first.size() != 0)
+   if (!lib->first.empty())
      {
      this->EmitForVS6( *lib, dep_map, done, visited, newLinkLibrariesForVS6 );
      }
@@ -1647,7 +1644,7 @@ void cmTarget::GatherDependenciesForVS6( const cmMakefile& mf,
     while( end != std::string::npos )
       {
       std::string l = depline.substr( start, end-start );
-      if( l.size() != 0 )
+      if(!l.empty())
         {
         if (l == "debug")
           {
@@ -1717,7 +1714,7 @@ void cmTarget::SetProperty(const std::string& prop, const char* value)
   if (this->GetType() == INTERFACE_LIBRARY
       && !whiteListedInterfaceProperty(prop))
     {
-    cmOStringStream e;
+    std::ostringstream e;
     e << "INTERFACE_LIBRARY targets may only have whitelisted properties.  "
          "The property \"" << prop << "\" is not allowed.";
     this->Makefile->IssueMessage(cmake::FATAL_ERROR, e.str());
@@ -1725,7 +1722,7 @@ void cmTarget::SetProperty(const std::string& prop, const char* value)
     }
   else if (prop == "NAME")
     {
-    cmOStringStream e;
+    std::ostringstream e;
     e << "NAME property is read-only\n";
     this->Makefile->IssueMessage(cmake::FATAL_ERROR, e.str());
     return;
@@ -1768,7 +1765,7 @@ void cmTarget::SetProperty(const std::string& prop, const char* value)
     }
   else if(prop == "EXPORT_NAME" && this->IsImported())
     {
-    cmOStringStream e;
+    std::ostringstream e;
     e << "EXPORT_NAME property can't be set on imported targets (\""
           << this->Name << "\")\n";
     this->Makefile->IssueMessage(cmake::FATAL_ERROR, e.str());
@@ -1784,7 +1781,7 @@ void cmTarget::SetProperty(const std::string& prop, const char* value)
     {
     if(this->IsImported())
       {
-      cmOStringStream e;
+      std::ostringstream e;
       e << "SOURCES property can't be set on imported targets (\""
             << this->Name << "\")\n";
       this->Makefile->IssueMessage(cmake::FATAL_ERROR, e.str());
@@ -1812,7 +1809,7 @@ void cmTarget::AppendProperty(const std::string& prop, const char* value,
   if (this->GetType() == INTERFACE_LIBRARY
       && !whiteListedInterfaceProperty(prop))
     {
-    cmOStringStream e;
+    std::ostringstream e;
     e << "INTERFACE_LIBRARY targets may only have whitelisted properties.  "
          "The property \"" << prop << "\" is not allowed.";
     this->Makefile->IssueMessage(cmake::FATAL_ERROR, e.str());
@@ -1820,7 +1817,7 @@ void cmTarget::AppendProperty(const std::string& prop, const char* value,
     }
   else if (prop == "NAME")
     {
-    cmOStringStream e;
+    std::ostringstream e;
     e << "NAME property is read-only\n";
     this->Makefile->IssueMessage(cmake::FATAL_ERROR, e.str());
     return;
@@ -1855,7 +1852,7 @@ void cmTarget::AppendProperty(const std::string& prop, const char* value,
     }
   else if(prop == "EXPORT_NAME" && this->IsImported())
     {
-    cmOStringStream e;
+    std::ostringstream e;
     e << "EXPORT_NAME property can't be set on imported targets (\""
           << this->Name << "\")\n";
     this->Makefile->IssueMessage(cmake::FATAL_ERROR, e.str());
@@ -1870,7 +1867,7 @@ void cmTarget::AppendProperty(const std::string& prop, const char* value,
     {
     if(this->IsImported())
       {
-      cmOStringStream e;
+      std::ostringstream e;
       e << "SOURCES property can't be set on imported targets (\""
             << this->Name << "\")\n";
       this->Makefile->IssueMessage(cmake::FATAL_ERROR, e.str());
@@ -1899,7 +1896,7 @@ std::string cmTarget::GetExportName() const
     {
     if (!cmGeneratorExpression::IsValidTargetName(exportName))
       {
-      cmOStringStream e;
+      std::ostringstream e;
       e << "EXPORT_NAME property \"" << exportName << "\" for \""
         << this->GetName() << "\": is not valid.";
       cmSystemTools::Error(e.str().c_str());
@@ -2011,7 +2008,7 @@ static void processIncludeDirectories(cmTarget const* tgt,
       if (fromImported
           && !cmSystemTools::FileExists(li->c_str()))
         {
-        cmOStringStream e;
+        std::ostringstream e;
         cmake::MessageType messageType = cmake::FATAL_ERROR;
         if (checkCMP0027)
           {
@@ -2044,7 +2041,7 @@ static void processIncludeDirectories(cmTarget const* tgt,
 
       if (!cmSystemTools::FileIsFullPath(li->c_str()))
         {
-        cmOStringStream e;
+        std::ostringstream e;
         bool noMessage = false;
         cmake::MessageType messageType = cmake::FATAL_ERROR;
         if (!targetName.empty())
@@ -2160,7 +2157,7 @@ cmTarget::GetIncludeDirectories(const std::string& config) const
         it = impl->Libraries.begin();
         it != impl->Libraries.end(); ++it)
       {
-      std::string libDir = cmSystemTools::CollapseFullPath(it->c_str());
+      std::string libDir = cmSystemTools::CollapseFullPath(*it);
 
       static cmsys::RegularExpression
         frameworkCheck("(.*\\.framework)(/Versions/[^/]+)?/[^/]+$");
@@ -2394,7 +2391,7 @@ void cmTarget::GetCompileDefinitions(std::vector<std::string> &list,
         {
         case cmPolicies::WARN:
           {
-          cmOStringStream e;
+          std::ostringstream e;
           e << this->Makefile->GetCMakeInstance()->GetPolicies()
                    ->GetPolicyWarning(cmPolicies::CMP0043);
           this->Makefile->IssueMessage(cmake::AUTHOR_WARNING,
@@ -2527,7 +2524,7 @@ static void cmTargetCheckLINK_INTERFACE_LIBRARIES(
                       "LINK_INTERFACE_LIBRARIES");
 
   // Report an error.
-  cmOStringStream e;
+  std::ostringstream e;
   e << "Property " << prop << " may not contain link-type keyword \""
     << keys.match(2) << "\".  "
     << "The " << base << " property has a per-configuration "
@@ -2564,7 +2561,7 @@ static void cmTargetCheckINTERFACE_LINK_LIBRARIES(const char* value,
     }
 
   // Report an error.
-  cmOStringStream e;
+  std::ostringstream e;
 
   e << "Property INTERFACE_LINK_LIBRARIES may not contain link-type "
     "keyword \"" << keys.match(2) << "\".  The INTERFACE_LINK_LIBRARIES "
@@ -2769,16 +2766,11 @@ const char* cmTarget::GetLocationForBuild() const
 
   // Now handle the deprecated build-time configuration location.
   location = this->GetDirectory();
-  if(!location.empty())
-    {
-    location += "/";
-    }
   const char* cfgid = this->Makefile->GetDefinition("CMAKE_CFG_INTDIR");
   if(cfgid && strcmp(cfgid, ".") != 0)
     {
     location += "/";
     location += cfgid;
-    location += "/";
     }
 
   if(this->IsAppBundleOnApple())
@@ -2868,7 +2860,7 @@ bool cmTarget::HandleLocationPropertyPolicy(cmMakefile* context) const
     {
     return true;
     }
-  cmOStringStream e;
+  std::ostringstream e;
   const char *modal = 0;
   cmake::MessageType messageType = cmake::AUTHOR_WARNING;
   switch (context->GetPolicyStatus(cmPolicies::CMP0026))
@@ -2927,7 +2919,7 @@ const char *cmTarget::GetProperty(const std::string& prop,
   if (this->GetType() == INTERFACE_LIBRARY
       && !whiteListedInterfaceProperty(prop))
     {
-    cmOStringStream e;
+    std::ostringstream e;
     e << "INTERFACE_LIBRARY targets may only have whitelisted properties.  "
          "The property \"" << prop << "\" is not allowed.";
     context->IssueMessage(cmake::FATAL_ERROR, e.str());
@@ -3103,7 +3095,7 @@ const char *cmTarget::GetProperty(const std::string& prop,
         return 0;
         }
 
-      cmOStringStream ss;
+      std::ostringstream ss;
       const char* sep = "";
       typedef cmTargetInternals::TargetPropertyEntry
                                   TargetPropertyEntry;
@@ -3133,7 +3125,7 @@ const char *cmTarget::GetProperty(const std::string& prop,
 
             bool addContent = false;
             bool noMessage = true;
-            cmOStringStream e;
+            std::ostringstream e;
             cmake::MessageType messageType = cmake::AUTHOR_WARNING;
             switch(context->GetPolicyStatus(cmPolicies::CMP0051))
               {
@@ -3231,7 +3223,7 @@ public:
         {
         bool noMessage = false;
         cmake::MessageType messageType = cmake::FATAL_ERROR;
-        cmOStringStream e;
+        std::ostringstream e;
         switch(this->Makefile->GetPolicyStatus(cmPolicies::CMP0028))
           {
           case cmPolicies::WARN:
@@ -3352,7 +3344,7 @@ public:
       }
     else if(this->Preferred.size() > 1)
       {
-      cmOStringStream e;
+      std::ostringstream e;
       e << "Target " << this->Target->GetName()
         << " contains multiple languages with the highest linker preference"
         << " (" << this->Preference << "):\n";
@@ -3498,7 +3490,10 @@ const char* cmTarget::GetSuffixVariableInternal(bool implib) const
     case cmTarget::EXECUTABLE:
       return (implib
               ? "CMAKE_IMPORT_LIBRARY_SUFFIX"
-              : "CMAKE_EXECUTABLE_SUFFIX");
+                // Android GUI application packages store the native
+                // binary as a shared library.
+              : (this->IsAndroid && this->GetPropertyAsBool("ANDROID_GUI")?
+                 "CMAKE_SHARED_LIBRARY_SUFFIX" : "CMAKE_EXECUTABLE_SUFFIX"));
     default:
       break;
     }
@@ -3522,7 +3517,12 @@ const char* cmTarget::GetPrefixVariableInternal(bool implib) const
               ? "CMAKE_IMPORT_LIBRARY_PREFIX"
               : "CMAKE_SHARED_MODULE_PREFIX");
     case cmTarget::EXECUTABLE:
-      return (implib? "CMAKE_IMPORT_LIBRARY_PREFIX" : "");
+      return (implib
+              ? "CMAKE_IMPORT_LIBRARY_PREFIX"
+                // Android GUI application packages store the native
+                // binary as a shared library.
+              : (this->IsAndroid && this->GetPropertyAsBool("ANDROID_GUI")?
+                 "CMAKE_SHARED_LIBRARY_PREFIX" : ""));
     default:
       break;
     }
@@ -3716,7 +3716,7 @@ bool cmTarget::HasMacOSXRpathInstallNameDir(const std::string& config) const
 
   if(!this->Makefile->IsSet("CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG"))
     {
-    cmOStringStream w;
+    std::ostringstream w;
     w << "Attempting to use";
     if(macosx_rpath)
       {
@@ -4022,15 +4022,8 @@ void cmTarget::GetFullNameInternal(const std::string& config,
 
   if(this->IsCFBundleOnApple())
     {
-    fw_prefix = this->GetOutputName(config, false);
-    fw_prefix += ".";
-    const char *ext = this->GetProperty("BUNDLE_EXTENSION");
-    if (!ext)
-      {
-      ext = "bundle";
-      }
-    fw_prefix += ext;
-    fw_prefix += "/Contents/MacOS/";
+    fw_prefix = this->GetCFBundleDirectory(config, false);
+    fw_prefix += "/";
     targetPrefix = fw_prefix.c_str();
     targetSuffix = 0;
     }
@@ -4541,7 +4534,7 @@ bool cmTarget::ComputeOutputDir(const std::string& config,
   // specified as a relative path.  Treat a relative path as
   // relative to the current output directory for this makefile.
   out = (cmSystemTools::CollapseFullPath
-         (out.c_str(), this->Makefile->GetStartOutputDirectory()));
+         (out, this->Makefile->GetStartOutputDirectory()));
 
   // The generator may add the configuration's subdirectory.
   if(!conf.empty())
@@ -4607,7 +4600,7 @@ bool cmTarget::ComputePDBOutputDir(const std::string& kind,
   // specified as a relative path.  Treat a relative path as
   // relative to the current output directory for this makefile.
   out = (cmSystemTools::CollapseFullPath
-         (out.c_str(), this->Makefile->GetStartOutputDirectory()));
+         (out, this->Makefile->GetStartOutputDirectory()));
 
   // The generator may add the configuration's subdirectory.
   if(!conf.empty())
@@ -4699,7 +4692,7 @@ const char* cmTarget::GetExportMacro() const
       {
       std::string in = this->GetName();
       in += "_EXPORTS";
-      this->ExportMacro = cmSystemTools::MakeCindentifier(in.c_str());
+      this->ExportMacro = cmSystemTools::MakeCindentifier(in);
       }
     return this->ExportMacro.c_str();
     }
@@ -4767,16 +4760,6 @@ std::pair<bool, const char*> consistentStringProperty(const char *lhs,
   return std::make_pair(b, b ? lhs : 0);
 }
 
-#if defined(_MSC_VER) && _MSC_VER <= 1200
-template<typename T> const T&
-cmMaximum(const T& l, const T& r) {return l > r ? l : r;}
-template<typename T> const T&
-cmMinimum(const T& l, const T& r) {return l < r ? l : r;}
-#else
-#define cmMinimum std::min
-#define cmMaximum std::max
-#endif
-
 //----------------------------------------------------------------------------
 std::pair<bool, const char*> consistentNumberProperty(const char *lhs,
                                                       const char *rhs,
@@ -4784,11 +4767,7 @@ std::pair<bool, const char*> consistentNumberProperty(const char *lhs,
 {
   char *pEnd;
 
-#if defined(_MSC_VER)
-  static const char* const null_ptr = 0;
-#else
-# define null_ptr 0
-#endif
+  const char* const null_ptr = 0;
 
   long lnum = strtol(lhs, &pEnd, 0);
   if (pEnd == lhs || *pEnd != '\0' || errno == ERANGE)
@@ -4802,17 +4781,13 @@ std::pair<bool, const char*> consistentNumberProperty(const char *lhs,
     return std::pair<bool, const char*>(false, null_ptr);
     }
 
-#if !defined(_MSC_VER)
-#undef null_ptr
-#endif
-
   if (t == NumberMaxType)
     {
-    return std::make_pair(true, cmMaximum(lnum, rnum) == lnum ? lhs : rhs);
+    return std::make_pair(true, std::max(lnum, rnum) == lnum ? lhs : rhs);
     }
   else
     {
-    return std::make_pair(true, cmMinimum(lnum, rnum) == lnum ? lhs : rhs);
+    return std::make_pair(true, std::min(lnum, rnum) == lnum ? lhs : rhs);
     }
 }
 
@@ -4835,16 +4810,12 @@ std::pair<bool, const char*> consistentProperty(const char *lhs,
     return std::make_pair(true, lhs);
     }
 
-#if defined(_MSC_VER)
-  static const char* const null_ptr = 0;
-#else
-# define null_ptr 0
-#endif
+  const char* const null_ptr = 0;
 
   switch(t)
   {
   case BoolType:
-    assert(!"consistentProperty for strings called with BoolType");
+    assert(0 && "consistentProperty for strings called with BoolType");
     return std::pair<bool, const char*>(false, null_ptr);
   case StringType:
     return consistentStringProperty(lhs, rhs);
@@ -4852,13 +4823,8 @@ std::pair<bool, const char*> consistentProperty(const char *lhs,
   case NumberMaxType:
     return consistentNumberProperty(lhs, rhs, t);
   }
-  assert(!"Unreachable!");
+  assert(0 && "Unreachable!");
   return std::pair<bool, const char*>(false, null_ptr);
-
-#if !defined(_MSC_VER)
-#undef null_ptr
-#endif
-
 }
 
 template<typename PropertyType>
@@ -4942,7 +4908,7 @@ std::string compatibilityType(CompatibleType t)
     case NumberMinType:
       return "Numeric minimum compatibility";
     }
-  assert(!"Unreachable!");
+  assert(0 && "Unreachable!");
   return "";
 }
 
@@ -4958,7 +4924,7 @@ std::string compatibilityAgree(CompatibleType t, bool dominant)
     case NumberMinType:
       return dominant ? "(Dominant)\n" : "(Ignored)\n";
     }
-  assert(!"Unreachable!");
+  assert(0 && "Unreachable!");
   return "";
 }
 
@@ -5048,7 +5014,7 @@ PropertyType checkInterfacePropertyCompatibility(cmTarget const* tgt,
         report += compatibilityAgree(t, propContent != consistent.second);
         if (!consistent.first)
           {
-          cmOStringStream e;
+          std::ostringstream e;
           e << "Property " << p << " on target \""
             << tgt->GetName() << "\" does\nnot match the "
             "INTERFACE_" << p << " property requirement\nof "
@@ -5081,7 +5047,7 @@ PropertyType checkInterfacePropertyCompatibility(cmTarget const* tgt,
         report += compatibilityAgree(t, propContent != consistent.second);
         if (!consistent.first)
           {
-          cmOStringStream e;
+          std::ostringstream e;
           e << "Property " << p << " on target \""
             << tgt->GetName() << "\" is\nimplied to be " << defaultValue
             << " because it was used to determine the link libraries\n"
@@ -5115,7 +5081,7 @@ PropertyType checkInterfacePropertyCompatibility(cmTarget const* tgt,
           report += compatibilityAgree(t, propContent != consistent.second);
           if (!consistent.first)
             {
-            cmOStringStream e;
+            std::ostringstream e;
             e << "The INTERFACE_" << p << " property of \""
               << theTarget->GetName() << "\" does\nnot agree with the value "
                 "of " << p << " already determined\nfor \""
@@ -5272,7 +5238,7 @@ cmTarget::GetObjectLibrariesCMP0026(std::vector<cmTarget*>& objlibs) const
           {
           continue;
           }
-        cmTarget *objLib = this->Makefile->FindTargetToUse(objLibName.c_str());
+        cmTarget *objLib = this->Makefile->FindTargetToUse(objLibName);
         if(objLib)
           {
           objlibs.push_back(objLib);
@@ -5949,8 +5915,7 @@ cmTarget::GetCompatibleInterfaces(std::string const& config) const
         { \
         std::vector<std::string> props; \
         cmSystemTools::ExpandListArgument(prop, props); \
-        std::copy(props.begin(), props.end(), \
-                  std::inserter(compat.Props##x, compat.Props##x.begin())); \
+        compat.Props##x.insert(props.begin(), props.end()); \
         }
       CM_READ_COMPATIBLE_INTERFACE(BOOL, Bool)
       CM_READ_COMPATIBLE_INTERFACE(STRING, String)
@@ -6023,7 +5988,7 @@ cmTargetInternals::ComputeLinkInterfaceLibraries(
     if (newExplicitLibraries
         && strcmp(newExplicitLibraries, explicitLibraries) != 0)
       {
-      cmOStringStream w;
+      std::ostringstream w;
       w <<
         (thisTarget->Makefile->GetPolicies()
          ->GetPolicyWarning(cmPolicies::CMP0022)) << "\n"
@@ -6069,8 +6034,8 @@ cmTargetInternals::ComputeLinkInterfaceLibraries(
     // The link implementation is the default link interface.
     cmTarget::LinkImplementationLibraries const* impl =
       thisTarget->GetLinkImplementationLibrariesInternal(config, headTarget);
-    std::copy(impl->Libraries.begin(), impl->Libraries.end(),
-              std::back_inserter(iface.Libraries));
+    iface.Libraries.insert(iface.Libraries.end(),
+                           impl->Libraries.begin(), impl->Libraries.end());
     if(thisTarget->PolicyStatusCMP0022 == cmPolicies::WARN &&
        !this->PolicyWarnedCMP0022 && !usage_requirements_only)
       {
@@ -6087,30 +6052,14 @@ cmTargetInternals::ComputeLinkInterfaceLibraries(
         }
       if (ifaceLibs != iface.Libraries)
         {
-        std::string oldLibraries;
-        std::string newLibraries;
-        const char *sep = "";
-        for(std::vector<cmLinkImplItem>::const_iterator it
-              = impl->Libraries.begin(); it != impl->Libraries.end(); ++it)
-          {
-          oldLibraries += sep;
-          oldLibraries += *it;
-          sep = ";";
-          }
-        sep = "";
-        for(std::vector<cmLinkItem>::const_iterator it
-              = ifaceLibs.begin(); it != ifaceLibs.end(); ++it)
-          {
-          newLibraries += sep;
-          newLibraries += *it;
-          sep = ";";
-          }
+        std::string oldLibraries = cmJoin(impl->Libraries, ";");
+        std::string newLibraries = cmJoin(ifaceLibs, ";");
         if(oldLibraries.empty())
           { oldLibraries = "(empty)"; }
         if(newLibraries.empty())
           { newLibraries = "(empty)"; }
 
-        cmOStringStream w;
+        std::ostringstream w;
         w <<
           (thisTarget->Makefile->GetPolicies()
            ->GetPolicyWarning(cmPolicies::CMP0022)) << "\n"
@@ -6365,7 +6314,7 @@ cmTargetInternals::ComputeLinkImplementationLibraries(
           {
           bool noMessage = false;
           cmake::MessageType messageType = cmake::FATAL_ERROR;
-          cmOStringStream e;
+          std::ostringstream e;
           switch(thisTarget->GetPolicyStatusCMP0038())
             {
             case cmPolicies::WARN:
@@ -6448,11 +6397,8 @@ cmTargetInternals::ComputeLinkImplementationLanguages(
   // Get languages used in our source files.
   thisTarget->GetLanguages(languages, config);
   // Copy the set of langauges to the link implementation.
-  for(std::set<std::string>::iterator li = languages.begin();
-      li != languages.end(); ++li)
-    {
-    impl.Languages.push_back(*li);
-    }
+  impl.Languages.insert(impl.Languages.begin(),
+                        languages.begin(), languages.end());
 }
 
 //----------------------------------------------------------------------------
@@ -6471,7 +6417,7 @@ cmTarget const* cmTarget::FindTargetToLink(std::string const& name) const
 
   if(tgt && tgt->GetType() == cmTarget::OBJECT_LIBRARY)
     {
-    cmOStringStream e;
+    std::ostringstream e;
     e << "Target \"" << this->GetName() << "\" links to "
       "OBJECT library \"" << tgt->GetName() << "\" but this is not "
       "allowed.  "
@@ -6510,7 +6456,7 @@ std::string cmTarget::CheckCMP0004(std::string const& item) const
       {
       case cmPolicies::WARN:
         {
-        cmOStringStream w;
+        std::ostringstream w;
         w << (this->Makefile->GetPolicies()
               ->GetPolicyWarning(cmPolicies::CMP0004)) << "\n"
           << "Target \"" << this->GetName() << "\" links to item \""
@@ -6522,7 +6468,7 @@ std::string cmTarget::CheckCMP0004(std::string const& item) const
         break;
       case cmPolicies::NEW:
         {
-        cmOStringStream e;
+        std::ostringstream e;
         e << "Target \"" << this->GetName() << "\" links to item \""
           << item << "\" which has leading or trailing whitespace.  "
           << "This is now an error according to policy CMP0004.";
@@ -6532,7 +6478,7 @@ std::string cmTarget::CheckCMP0004(std::string const& item) const
       case cmPolicies::REQUIRED_IF_USED:
       case cmPolicies::REQUIRED_ALWAYS:
         {
-        cmOStringStream e;
+        std::ostringstream e;
         e << (this->Makefile->GetPolicies()
               ->GetRequiredPolicyError(cmPolicies::CMP0004)) << "\n"
           << "Target \"" << this->GetName() << "\" links to item \""
@@ -6571,7 +6517,7 @@ const char * getLinkInterfaceDependentProperty(cmTarget const* tgt,
   switch(t)
   {
   case BoolType:
-    assert(!"String compatibility check function called for boolean");
+    assert(0 && "String compatibility check function called for boolean");
     return 0;
   case StringType:
     return tgt->GetLinkInterfaceDependentStringProperty(prop, config);
@@ -6580,7 +6526,7 @@ const char * getLinkInterfaceDependentProperty(cmTarget const* tgt,
   case NumberMaxType:
     return tgt->GetLinkInterfaceDependentNumberMaxProperty(prop, config);
   }
-  assert(!"Unreachable!");
+  assert(0 && "Unreachable!");
   return 0;
 }
 
@@ -6613,7 +6559,7 @@ void checkPropertyConsistency(cmTarget const* depender,
     std::string pfile = pdir + pname + ".rst";
     if(cmSystemTools::FileExists(pfile.c_str(), true))
       {
-      cmOStringStream e;
+      std::ostringstream e;
       e << "Target \"" << dependee->GetName() << "\" has property \""
         << *pi << "\" listed in its " << propName << " property.  "
           "This is not allowed.  Only user-defined properties may appear "
@@ -6741,41 +6687,34 @@ void cmTarget::CheckPropertyCompatibility(cmComputeLinkInformation *info,
 
   if (!prop.empty())
     {
-    // Use a std::set to keep the error message sorted.
-    std::set<std::string> props;
+    // Use a sorted std::vector to keep the error message sorted.
+    std::vector<std::string> props;
     std::set<std::string>::const_iterator i = emittedBools.find(prop);
     if (i != emittedBools.end())
       {
-      props.insert(strBool);
+      props.push_back(strBool);
       }
     i = emittedStrings.find(prop);
     if (i != emittedStrings.end())
       {
-      props.insert(strString);
+      props.push_back(strString);
       }
     i = emittedMinNumbers.find(prop);
     if (i != emittedMinNumbers.end())
       {
-      props.insert(strNumMin);
+      props.push_back(strNumMin);
       }
     i = emittedMaxNumbers.find(prop);
     if (i != emittedMaxNumbers.end())
       {
-      props.insert(strNumMax);
+      props.push_back(strNumMax);
       }
+    std::sort(props.begin(), props.end());
 
-    std::string propsString = *props.begin();
-    props.erase(props.begin());
-    while (props.size() > 1)
-      {
-      propsString += ", " + *props.begin();
-      props.erase(props.begin());
-      }
-   if (props.size() == 1)
-     {
-     propsString += " and the " + *props.begin();
-     }
-    cmOStringStream e;
+    std::string propsString = cmJoin(cmRange(props).retreat(1), ", ");
+    propsString += " and the " + props.back();
+
+    std::ostringstream e;
     e << "Property \"" << prop << "\" appears in both the "
       << propsString <<
     " property in the dependencies of target \"" << this->GetName() <<
@@ -6918,10 +6857,7 @@ cmTargetLinkInformationMap
 //----------------------------------------------------------------------------
 cmTargetLinkInformationMap::~cmTargetLinkInformationMap()
 {
-  for(derived::iterator i = this->begin(); i != this->end(); ++i)
-    {
-    delete i->second;
-    }
+  cmDeleteAll(*this);
 }
 
 //----------------------------------------------------------------------------

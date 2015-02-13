@@ -45,7 +45,7 @@ bool cmExportBuildFileGenerator::GenerateMainFile(std::ostream& os)
       }
     else
       {
-      cmOStringStream e;
+      std::ostringstream e;
       e << "given target \"" << te->GetName() << "\" more than once.";
       this->Makefile->GetCMakeInstance()
           ->IssueMessage(cmake::FATAL_ERROR, e.str(), this->Backtrace);
@@ -75,6 +75,9 @@ bool cmExportBuildFileGenerator::GenerateMainFile(std::ostream& os)
     ImportPropertyMap properties;
 
     this->PopulateInterfaceProperty("INTERFACE_INCLUDE_DIRECTORIES", te,
+                                    cmGeneratorExpression::BuildInterface,
+                                    properties, missingTargets);
+    this->PopulateInterfaceProperty("INTERFACE_SOURCES", te,
                                     cmGeneratorExpression::BuildInterface,
                                     properties, missingTargets);
     this->PopulateInterfaceProperty("INTERFACE_COMPILE_DEFINITIONS", te,
@@ -303,7 +306,7 @@ cmExportBuildFileGenerator
     return;
     }
 
-  cmOStringStream e;
+  std::ostringstream e;
   e << "export called with target \"" << depender->GetName()
     << "\" which requires target \"" << dependee->GetName() << "\" ";
   if (occurrences == 0)

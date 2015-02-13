@@ -191,6 +191,14 @@ class cmake
   ///! Get the names of the current registered generators
   void GetRegisteredGenerators(std::vector<std::string>& names);
 
+  ///! Set the name of the selected generator-specific platform.
+  void SetGeneratorPlatform(std::string const& ts)
+    { this->GeneratorPlatform = ts; }
+
+  ///! Get the name of the selected generator-specific platform.
+  std::string const& GetGeneratorPlatform() const
+    { return this->GeneratorPlatform; }
+
   ///! Set the name of the selected generator-specific toolset.
   void SetGeneratorToolset(std::string const& ts)
     { this->GeneratorToolset = ts; }
@@ -403,6 +411,7 @@ protected:
   std::string StartOutputDirectory;
   bool SuppressDevWarnings;
   bool DoSuppressDevWarnings;
+  std::string GeneratorPlatform;
   std::string GeneratorToolset;
 
   ///! read in a cmake list file to initialize the cache
@@ -467,6 +476,7 @@ private:
   {"-U <globbing_expr>", "Remove matching entries from CMake cache."}, \
   {"-G <generator-name>", "Specify a build system generator."},\
   {"-T <toolset-name>", "Specify toolset name if supported by generator."}, \
+  {"-A <platform-name>", "Specify platform name if supported by generator."}, \
   {"-Wno-dev", "Suppress developer warnings."},\
   {"-Wdev", "Enable developer warnings."}
 

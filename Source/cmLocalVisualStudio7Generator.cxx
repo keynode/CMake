@@ -44,6 +44,16 @@ private:
 
 extern cmVS7FlagTable cmLocalVisualStudio7GeneratorFlagTable[];
 
+static void cmConvertToWindowsSlash(std::string& s)
+{
+  std::string::size_type pos = 0;
+  while((pos = s.find('/', pos)) != std::string::npos)
+    {
+    s[pos] = '\\';
+    pos++;
+    }
+}
+
 //----------------------------------------------------------------------------
 cmLocalVisualStudio7Generator::cmLocalVisualStudio7Generator(VSVersion v):
   cmLocalVisualStudioGenerator(v)
@@ -582,6 +592,15 @@ cmVS7FlagTable cmLocalVisualStudio7GeneratorLinkFlagTable[] =
   {0,0,0,0,0}
 };
 
+cmVS7FlagTable cmLocalVisualStudio7GeneratorFortranLinkFlagTable[] =
+{
+  {"LinkIncremental", "INCREMENTAL:NO", "link incremental",
+   "linkIncrementalNo", 0},
+  {"LinkIncremental", "INCREMENTAL:YES", "link incremental",
+   "linkIncrementalYes", 0},
+  {0,0,0,0,0}
+};
+
 //----------------------------------------------------------------------------
 // Helper class to write build event <Tool .../> elements.
 class cmLocalVisualStudio7Generator::EventWriter
@@ -786,6 +805,20 @@ void cmLocalVisualStudio7Generator::WriteConfiguration(std::ostream& fout,
        << "\t\t\tUseOfMFC=\"" << mfcFlag << "\"\n"
        << "\t\t\tATLMinimizesCRunTimeLibraryUsage=\"false\"\n";
 
+  if (this->FortranProject)
+    {
+    // Intel Fortran >= 15.0 uses TargetName property.
+    std::string targetNameFull = target.GetFullName(configName);
+    std::string targetName =
+      cmSystemTools::GetFilenameWithoutLastExtension(targetNameFull);
+    std::string targetExt =
+      cmSystemTools::GetFilenameLastExtension(targetNameFull);
+    fout <<
+      "\t\t\tTargetName=\"" << this->EscapeForXML(targetName) << "\"\n"
+      "\t\t\tTargetExt=\"" << this->EscapeForXML(targetExt) << "\"\n"
+      ;
+    }
+
   // If unicode is enabled change the character set to unicode, if not
   // then default to MBCS.
   if(targetOptions.UsingUnicode())
@@ -862,6 +895,31 @@ void cmLocalVisualStudio7Generator::WriteConfiguration(std::ostream& fout,
       }
     }
   fout << "/>\n";  // end of <Tool Name=VCCLCompilerTool
+  if(gg->IsMasmEnabled() && !this->FortranProject)
+    {
+    Options masmOptions(this, Options::MasmCompiler, 0, 0);
+    fout <<
+      "\t\t\t<Tool\n"
+      "\t\t\t\tName=\"MASM\"\n"
+      "\t\t\t\tIncludePaths=\""
+      ;
+    const char* sep = "";
+    for(i = includes.begin(); i != includes.end(); ++i)
+      {
+      std::string inc = *i;
+      cmConvertToWindowsSlash(inc);
+      fout << sep << this->EscapeForXML(inc);
+      sep = ";";
+      }
+    fout << "\"\n";
+    // Use same preprocessor definitions as VCCLCompilerTool.
+    targetOptions.OutputPreprocessorDefinitions(fout, "\t\t\t\t", "\n",
+                                                "ASM_MASM");
+    masmOptions.OutputFlagMap(fout, "\t\t\t\t");
+    fout <<
+      "\t\t\t\tObjectFile=\"$(IntDir)\\\"\n"
+      "\t\t\t/>\n";
+    }
   tool = "VCCustomBuildTool";
   if(this->FortranProject)
     {
@@ -1007,8 +1065,13 @@ void cmLocalVisualStudio7Generator::OutputBuildTool(std::ostream& fout,
     extraLinkOptions += " ";
     extraLinkOptions += targetLinkFlags;
     }
-  Options linkOptions(this, Options::Linker,
-                      cmLocalVisualStudio7GeneratorLinkFlagTable);
+  Options linkOptions(this, Options::Linker);
+  if(this->FortranProject)
+    {
+    linkOptions.AddTable(cmLocalVisualStudio7GeneratorFortranLinkFlagTable);
+    }
+  linkOptions.AddTable(cmLocalVisualStudio7GeneratorLinkFlagTable);
+
   linkOptions.Parse(extraLinkOptions.c_str());
   if(!this->ModuleDefinitionFile.empty())
     {
@@ -1052,7 +1115,7 @@ void cmLocalVisualStudio7Generator::OutputBuildTool(std::ostream& fout,
 
     if(this->GetVersion() < VS8 || this->FortranProject)
       {
-      cmOStringStream libdeps;
+      std::ostringstream libdeps;
       this->Internal->OutputObjects(libdeps, &target);
       if(!libdeps.str().empty())
         {
@@ -1650,7 +1713,7 @@ bool cmLocalVisualStudio7Generator
 
   // Write the children to temporary output.
   bool hasChildrenWithSources = false;
-  cmOStringStream tmpOut;
+  std::ostringstream tmpOut;
   for(unsigned int i=0;i<children.size();++i)
     {
     if(this->WriteGroup(&children[i], target, tmpOut, libName, configs))
@@ -1695,11 +1758,12 @@ bool cmLocalVisualStudio7Generator
       else if(!fcinfo.FileConfigMap.empty())
         {
         const char* aCompilerTool = "VCCLCompilerTool";
-        const char* lang = "CXX";
+        const char* ppLang = "CXX";
         if(this->FortranProject)
           {
           aCompilerTool = "VFFortranCompilerTool";
           }
+        std::string const& lang = (*sf)->GetLanguage();
         std::string ext = (*sf)->GetExtension();
         ext = cmSystemTools::LowerCase(ext);
         if(ext == "idl")
@@ -1713,7 +1777,7 @@ bool cmLocalVisualStudio7Generator
         if(ext == "rc")
           {
           aCompilerTool = "VCResourceCompilerTool";
-          lang = "RC";
+          ppLang = "RC";
           if(this->FortranProject)
             {
             aCompilerTool = "VFResourceCompilerTool";
@@ -1726,6 +1790,11 @@ bool cmLocalVisualStudio7Generator
             {
             aCompilerTool = "VFCustomBuildTool";
             }
+          }
+        if (gg->IsMasmEnabled() && !this->FortranProject &&
+            lang == "ASM_MASM")
+          {
+          aCompilerTool = "MASM";
           }
         for(std::map<std::string, cmLVS7GFileConfig>::const_iterator
               fci = fcinfo.FileConfigMap.begin();
@@ -1763,7 +1832,7 @@ bool cmLocalVisualStudio7Generator
             fileOptions.OutputFlagMap(fout, "\t\t\t\t\t");
             fileOptions.OutputPreprocessorDefinitions(fout,
                                                       "\t\t\t\t\t", "\n",
-                                                      lang);
+                                                      ppLang);
             }
           if(!fc.AdditionalDeps.empty())
             {
@@ -2095,6 +2164,16 @@ cmLocalVisualStudio7Generator::WriteProjectStart(std::ostream& fout,
        << "\t<Platforms>\n"
        << "\t\t<Platform\n\t\t\tName=\"" << gg->GetPlatformName() << "\"/>\n"
        << "\t</Platforms>\n";
+  if(gg->IsMasmEnabled())
+    {
+    fout <<
+      "\t<ToolFiles>\n"
+      "\t\t<DefaultToolFile\n"
+      "\t\t\tFileName=\"masm.rules\"\n"
+      "\t\t/>\n"
+      "\t</ToolFiles>\n"
+      ;
+    }
 }
 
 

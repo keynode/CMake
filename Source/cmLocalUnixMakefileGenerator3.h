@@ -61,6 +61,13 @@ public:
                      const std::vector<std::string>& commands,
                      bool symbolic,
                      bool in_help = false);
+  void WriteMakeRule(std::ostream& os,
+                     const char* comment,
+                     const std::vector<std::string>& outputs,
+                     const std::vector<std::string>& depends,
+                     const std::vector<std::string>& commands,
+                     bool symbolic,
+                     bool in_help = false);
 
   // write the main variables used by the makefiles
   void WriteMakeVariables(std::ostream& makefileStream);
@@ -154,6 +161,9 @@ public:
   void SetBorlandMakeCurlyHack(bool b)
     { this->BorlandMakeCurlyHack = b; }
 
+  void SetNoMultiOutputMultiDepRules(bool b)
+    { this->NoMultiOutputMultiDepRules = b; }
+
   // used in writing out Cmake files such as WriteDirectoryInformation
   static void WriteCMakeArgument(std::ostream& os, const char* s);
 
@@ -174,8 +184,9 @@ public:
   // append an echo command
   enum EchoColor { EchoNormal, EchoDepend, EchoBuild, EchoLink,
                    EchoGenerate, EchoGlobal };
-  void AppendEcho(std::vector<std::string>& commands, const char* text,
-                  EchoColor color = EchoNormal);
+  struct EchoProgress { std::string Dir; std::string Arg; };
+  void AppendEcho(std::vector<std::string>& commands, std::string const& text,
+                  EchoColor color = EchoNormal, EchoProgress const* = 0);
 
   /** Get whether the makefile is to have color.  */
   bool GetColorMakefile() const { return this->ColorMakefile; }
@@ -338,6 +349,7 @@ private:
   bool PassMakeflags;
   bool MakeCommandEscapeTargetTwice;
   bool BorlandMakeCurlyHack;
+  bool NoMultiOutputMultiDepRules;
   //==========================================================================
 
   std::string HomeRelativeOutputPath;

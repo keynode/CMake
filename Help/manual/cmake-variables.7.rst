@@ -3,7 +3,7 @@
 cmake-variables(7)
 ******************
 
-.. only:: html or latex
+.. only:: html
 
    .. contents::
 
@@ -36,7 +36,9 @@ Variables that Provide Information
    /variable/CMAKE_EXECUTABLE_SUFFIX
    /variable/CMAKE_EXTRA_GENERATOR
    /variable/CMAKE_EXTRA_SHARED_LIBRARY_SUFFIXES
+   /variable/CMAKE_FIND_PACKAGE_NAME
    /variable/CMAKE_GENERATOR
+   /variable/CMAKE_GENERATOR_PLATFORM
    /variable/CMAKE_GENERATOR_TOOLSET
    /variable/CMAKE_HOME_DIRECTORY
    /variable/CMAKE_IMPORT_LIBRARY_PREFIX
@@ -46,6 +48,7 @@ Variables that Provide Information
    /variable/CMAKE_LINK_LIBRARY_SUFFIX
    /variable/CMAKE_MAJOR_VERSION
    /variable/CMAKE_MAKE_PROGRAM
+   /variable/CMAKE_MATCH_COUNT
    /variable/CMAKE_MINIMUM_REQUIRED_VERSION
    /variable/CMAKE_MINOR_VERSION
    /variable/CMAKE_PARENT_LIST_FILE
@@ -73,6 +76,8 @@ Variables that Provide Information
    /variable/CMAKE_VS_INTEL_Fortran_PROJECT_VERSION
    /variable/CMAKE_VS_MSBUILD_COMMAND
    /variable/CMAKE_VS_MSDEV_COMMAND
+   /variable/CMAKE_VS_NsightTegra_VERSION
+   /variable/CMAKE_VS_PLATFORM_NAME
    /variable/CMAKE_VS_PLATFORM_TOOLSET
    /variable/CMAKE_XCODE_PLATFORM_TOOLSET
    /variable/PROJECT_BINARY_DIR
@@ -176,6 +181,7 @@ Variables that Describe the System
    /variable/CMAKE_SYSTEM_VERSION
    /variable/CYGWIN
    /variable/ENV
+   /variable/MINGW
    /variable/MSVC10
    /variable/MSVC11
    /variable/MSVC12
@@ -190,6 +196,9 @@ Variables that Describe the System
    /variable/MSVC_VERSION
    /variable/UNIX
    /variable/WIN32
+   /variable/WINCE
+   /variable/WINDOWS_PHONE
+   /variable/WINDOWS_STORE
    /variable/XCODE_VERSION
 
 Variables that Control the Build
@@ -198,6 +207,9 @@ Variables that Control the Build
 .. toctree::
    :maxdepth: 1
 
+   /variable/CMAKE_ANDROID_API
+   /variable/CMAKE_ANDROID_API_MIN
+   /variable/CMAKE_ANDROID_GUI
    /variable/CMAKE_ARCHIVE_OUTPUT_DIRECTORY
    /variable/CMAKE_AUTOMOC_MOC_OPTIONS
    /variable/CMAKE_AUTOMOC
@@ -252,6 +264,7 @@ Variables that Control the Build
    /variable/CMAKE_USE_RELATIVE_PATHS
    /variable/CMAKE_VISIBILITY_INLINES_HIDDEN
    /variable/CMAKE_WIN32_EXECUTABLE
+   /variable/CMAKE_XCODE_ATTRIBUTE_an-attribute
    /variable/EXECUTABLE_OUTPUT_PATH
    /variable/LIBRARY_OUTPUT_PATH
 
@@ -343,6 +356,7 @@ Variables for CTest
    /variable/CTEST_HG_UPDATE_OPTIONS
    /variable/CTEST_MEMORYCHECK_COMMAND
    /variable/CTEST_MEMORYCHECK_COMMAND_OPTIONS
+   /variable/CTEST_MEMORYCHECK_SANITIZER_OPTIONS
    /variable/CTEST_MEMORYCHECK_SUPPRESSIONS_FILE
    /variable/CTEST_MEMORYCHECK_TYPE
    /variable/CTEST_NIGHTLY_START_TIME
@@ -360,6 +374,7 @@ Variables for CTest
    /variable/CTEST_TRIGGER_SITE
    /variable/CTEST_UPDATE_COMMAND
    /variable/CTEST_UPDATE_OPTIONS
+   /variable/CTEST_UPDATE_VERSION_ONLY
    /variable/CTEST_USE_LAUNCHERS
 
 Variables for CPack

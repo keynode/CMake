@@ -75,7 +75,7 @@ public:
         this->ParseError(atts);
         }
       // Create the log
-      cmOStringStream ostr;
+      std::ostringstream ostr;
       ostr << name << ":\n";
       int i = 0;
       for(; atts[i] != 0; i+=2)
@@ -198,7 +198,7 @@ void cmCTestMemCheckHandler::GenerateTestCommand(
 {
   std::vector<std::string>::size_type pp;
   std::string index;
-  cmOStringStream stream;
+  std::ostringstream stream;
   std::string memcheckcommand
     = cmSystemTools::ConvertToOutputPath(this->MemoryTester.c_str());
   stream << test;
@@ -223,7 +223,7 @@ void cmCTestMemCheckHandler::GenerateTestCommand(
     this->MemoryTesterEnvironmentVariable;
   for ( pp = 0; pp < this->MemoryTesterOptions.size(); pp ++ )
     {
-    if(memTesterEnvironmentVariable.size())
+    if(!memTesterEnvironmentVariable.empty())
       {
       // If we are using env to pass options, append all the options to
       // this string with space separation.
@@ -241,7 +241,7 @@ void cmCTestMemCheckHandler::GenerateTestCommand(
     }
   // if this is an env option type, then add the env string as a single
   // argument.
-  if(memTesterEnvironmentVariable.size())
+  if(!memTesterEnvironmentVariable.empty())
     {
     std::string::size_type pos = memTesterEnvironmentVariable.find("??");
     if (pos != std::string::npos)
@@ -370,11 +370,17 @@ void cmCTestMemCheckHandler::GenerateDartOutput(std::ostream& os)
     case cmCTestMemCheckHandler::BOUNDS_CHECKER:
       os << "BoundsChecker";
       break;
+    case cmCTestMemCheckHandler::ADDRESS_SANITIZER:
+      os << "AddressSanitizer";
+      break;
     case cmCTestMemCheckHandler::THREAD_SANITIZER:
       os << "ThreadSanitizer";
       break;
-    case cmCTestMemCheckHandler::ADDRESS_SANITIZER:
-      os << "AddressSanitizer";
+    case cmCTestMemCheckHandler::MEMORY_SANITIZER:
+      os << "MemorySanitizer";
+      break;
+    case cmCTestMemCheckHandler::UB_SANITIZER:
+      os << "UndefinedBehaviorSanitizer";
       break;
     default:
       os << "Unknown";
@@ -537,6 +543,14 @@ bool cmCTestMemCheckHandler::InitializeMemoryChecking()
     this->MemoryTesterStyle = cmCTestMemCheckHandler::BOUNDS_CHECKER;
     }
   if ( this->CTest->GetCTestConfiguration("MemoryCheckType")
+       == "AddressSanitizer")
+    {
+    this->MemoryTester
+      = this->CTest->GetCTestConfiguration("CMakeCommand").c_str();
+    this->MemoryTesterStyle = cmCTestMemCheckHandler::ADDRESS_SANITIZER;
+    this->LogWithPID = true; // even if we give the log file the pid is added
+    }
+  if ( this->CTest->GetCTestConfiguration("MemoryCheckType")
        == "ThreadSanitizer")
     {
     this->MemoryTester
@@ -545,11 +559,19 @@ bool cmCTestMemCheckHandler::InitializeMemoryChecking()
     this->LogWithPID = true; // even if we give the log file the pid is added
     }
   if ( this->CTest->GetCTestConfiguration("MemoryCheckType")
-       == "AddressSanitizer")
+       == "MemorySanitizer")
     {
     this->MemoryTester
       = this->CTest->GetCTestConfiguration("CMakeCommand").c_str();
-    this->MemoryTesterStyle = cmCTestMemCheckHandler::ADDRESS_SANITIZER;
+    this->MemoryTesterStyle = cmCTestMemCheckHandler::MEMORY_SANITIZER;
+    this->LogWithPID = true; // even if we give the log file the pid is added
+    }
+  if ( this->CTest->GetCTestConfiguration("MemoryCheckType")
+       == "UndefinedBehaviorSanitizer")
+    {
+    this->MemoryTester
+      = this->CTest->GetCTestConfiguration("CMakeCommand").c_str();
+    this->MemoryTesterStyle = cmCTestMemCheckHandler::UB_SANITIZER;
     this->LogWithPID = true; // even if we give the log file the pid is added
     }
   // Check the MemoryCheckType
@@ -570,7 +592,7 @@ bool cmCTestMemCheckHandler::InitializeMemoryChecking()
       this->MemoryTesterStyle = cmCTestMemCheckHandler::VALGRIND;
       }
     }
-  if(this->MemoryTester.size() == 0 )
+  if(this->MemoryTester.empty())
     {
     cmCTestLog(this->CTest, WARNING,
                "Memory checker (MemoryCheckCommand) "
@@ -674,10 +696,11 @@ bool cmCTestMemCheckHandler::InitializeMemoryChecking()
       this->MemoryTesterOptions.push_back("/M");
       break;
       }
-      // these two are almost the same but the env var used
-      // is different
+      // these are almost the same but the env var used is different
     case cmCTestMemCheckHandler::ADDRESS_SANITIZER:
     case cmCTestMemCheckHandler::THREAD_SANITIZER:
+    case cmCTestMemCheckHandler::MEMORY_SANITIZER:
+    case cmCTestMemCheckHandler::UB_SANITIZER:
       {
       // To pass arguments to ThreadSanitizer the environment variable
       // TSAN_OPTIONS is used. This is done with the cmake -E env command.
@@ -686,15 +709,30 @@ bool cmCTestMemCheckHandler::InitializeMemoryChecking()
       // TSAN_OPTIONS string with the log_path in it.
       this->MemoryTesterDynamicOptions.push_back("-E");
       this->MemoryTesterDynamicOptions.push_back("env");
-      std::string envVar = "TSAN_OPTIONS";
-      std::string extraOptions;
+      std::string envVar;
+      std::string extraOptions =
+        this->CTest->GetCTestConfiguration("MemoryCheckSanitizerOptions");
       if(this->MemoryTesterStyle == cmCTestMemCheckHandler::ADDRESS_SANITIZER)
         {
         envVar = "ASAN_OPTIONS";
-        extraOptions = " detect_leaks=1";
+        extraOptions += " detect_leaks=1";
+        }
+      else if(this->MemoryTesterStyle ==
+              cmCTestMemCheckHandler::THREAD_SANITIZER)
+        {
+        envVar = "TSAN_OPTIONS";
+        }
+      else if(this->MemoryTesterStyle ==
+              cmCTestMemCheckHandler::MEMORY_SANITIZER)
+        {
+        envVar = "MSAN_OPTIONS";
+        }
+      else if(this->MemoryTesterStyle == cmCTestMemCheckHandler::UB_SANITIZER)
+        {
+        envVar = "UBSAN_OPTIONS";
         }
       std::string outputFile = envVar + "=log_path=\""
-        + this->MemoryTesterOutputFile + "\"";
+        + this->MemoryTesterOutputFile + "\" ";
       this->MemoryTesterEnvironmentVariable = outputFile + extraOptions;
       break;
       }
@@ -728,9 +766,13 @@ ProcessMemCheckOutput(const std::string& str,
     return this->ProcessMemCheckPurifyOutput(str, log, results);
     }
   else if ( this->MemoryTesterStyle ==
+            cmCTestMemCheckHandler::ADDRESS_SANITIZER ||
+            this->MemoryTesterStyle ==
             cmCTestMemCheckHandler::THREAD_SANITIZER ||
             this->MemoryTesterStyle ==
-            cmCTestMemCheckHandler::ADDRESS_SANITIZER)
+            cmCTestMemCheckHandler::MEMORY_SANITIZER ||
+            this->MemoryTesterStyle ==
+            cmCTestMemCheckHandler::UB_SANITIZER)
     {
     return this->ProcessMemCheckSanitizerOutput(str, log, results);
     }
@@ -770,20 +812,29 @@ bool cmCTestMemCheckHandler::ProcessMemCheckSanitizerOutput(
   std::vector<int>& result)
 {
   std::string regex;
-  if(this->MemoryTesterStyle == cmCTestMemCheckHandler::THREAD_SANITIZER)
+  switch ( this->MemoryTesterStyle )
     {
-    regex = "WARNING: ThreadSanitizer: (.*) \\(pid=.*\\)";
-    }
-  else
-    {
-    regex = "ERROR: AddressSanitizer: (.*) on.*";
+    case cmCTestMemCheckHandler::ADDRESS_SANITIZER:
+      regex = "ERROR: AddressSanitizer: (.*) on.*";
+      break;
+    case cmCTestMemCheckHandler::THREAD_SANITIZER:
+      regex = "WARNING: ThreadSanitizer: (.*) \\(pid=.*\\)";
+      break;
+    case cmCTestMemCheckHandler::MEMORY_SANITIZER:
+      regex = "WARNING: MemorySanitizer: (.*)";
+      break;
+    case cmCTestMemCheckHandler::UB_SANITIZER:
+      regex = "runtime error: (.*)";
+      break;
+    default:
+      break;
     }
   cmsys::RegularExpression sanitizerWarning(regex);
   cmsys::RegularExpression leakWarning("(Direct|Indirect) leak of .*");
   int defects = 0;
   std::vector<std::string> lines;
   cmSystemTools::Split(str.c_str(), lines);
-  cmOStringStream ostr;
+  std::ostringstream ostr;
   log = "";
   for( std::vector<std::string>::iterator i = lines.begin();
        i != lines.end(); ++i)
@@ -797,10 +848,10 @@ bool cmCTestMemCheckHandler::ProcessMemCheckSanitizerOutput(
       {
       resultFound = sanitizerWarning.match(1);
       }
-    if(resultFound.size())
+    if(!resultFound.empty())
       {
       std::vector<int>::size_type idx = this->FindOrAddWarning(resultFound);
-      if(result.size() == 0 || idx > result.size()-1)
+      if(result.empty() || idx > result.size()-1)
         {
         result.push_back(1);
         }
@@ -827,7 +878,7 @@ bool cmCTestMemCheckHandler::ProcessMemCheckPurifyOutput(
 {
   std::vector<std::string> lines;
   cmSystemTools::Split(str.c_str(), lines);
-  cmOStringStream ostr;
+  std::ostringstream ostr;
   log = "";
 
   cmsys::RegularExpression pfW("^\\[[WEI]\\] ([A-Z][A-Z][A-Z][A-Z]*): ");
@@ -890,7 +941,7 @@ bool cmCTestMemCheckHandler::ProcessMemCheckValgrindOutput(
 
   std::string::size_type cc;
 
-  cmOStringStream ostr;
+  std::ostringstream ostr;
   log = "";
 
   int defects = 0;
@@ -932,7 +983,6 @@ bool cmCTestMemCheckHandler::ProcessMemCheckValgrindOutput(
   double sttime = cmSystemTools::GetTime();
   cmCTestLog(this->CTest, DEBUG, "Start test: " << lines.size() << std::endl);
   std::string::size_type totalOutputSize = 0;
-  bool outputFull = false;
   for ( cc = 0; cc < lines.size(); cc ++ )
     {
     cmCTestLog(this->CTest, DEBUG, "test line "
@@ -1019,32 +1069,30 @@ bool cmCTestMemCheckHandler::ProcessMemCheckValgrindOutput(
       }
     }
   // Now put all all the non valgrind output into the test output
-  if(!outputFull)
+  // This should be last in case it gets truncated by the output
+  // limiting code
+  for(std::vector<std::string::size_type>::iterator i =
+        nonValGrindOutput.begin(); i != nonValGrindOutput.end(); ++i)
     {
-    for(std::vector<std::string::size_type>::iterator i =
-          nonValGrindOutput.begin(); i != nonValGrindOutput.end(); ++i)
+    totalOutputSize += lines[*i].size();
+    cmCTestLog(this->CTest, DEBUG, "before xml safe "
+               << lines[*i] << std::endl);
+    cmCTestLog(this->CTest, DEBUG, "after  xml safe "
+               <<  cmXMLSafe(lines[*i]) << std::endl);
+    ostr << cmXMLSafe(lines[*i]) << std::endl;
+    if(!unlimitedOutput && totalOutputSize >
+       static_cast<size_t>(this->CustomMaximumFailedTestOutputSize))
       {
-      totalOutputSize += lines[*i].size();
-      cmCTestLog(this->CTest, DEBUG, "before xml safe "
-                 << lines[*i] << std::endl);
-      cmCTestLog(this->CTest, DEBUG, "after  xml safe "
-                 <<  cmXMLSafe(lines[*i]) << std::endl);
-
-      ostr << cmXMLSafe(lines[*i]) << std::endl;
-      if(!unlimitedOutput && totalOutputSize >
-         static_cast<size_t>(this->CustomMaximumFailedTestOutputSize))
-        {
-        outputFull = true;
-        ostr << "....\n";
-        ostr << "Test Output for this test has been truncated see testing"
-          " machine logs for full output,\n";
-        ostr << "or put CTEST_FULL_OUTPUT in the output of "
-          "this test program.\n";
-        }
+      ostr << "....\n";
+      ostr << "Test Output for this test has been truncated see testing"
+        " machine logs for full output,\n";
+      ostr << "or put CTEST_FULL_OUTPUT in the output of "
+        "this test program.\n";
+      break;  // stop the copy of output if we are full
       }
     }
   cmCTestLog(this->CTest, DEBUG, "End test (elapsed: "
-    << (cmSystemTools::GetTime() - sttime) << std::endl);
+             << (cmSystemTools::GetTime() - sttime) << std::endl);
   log = ostr.str();
   if ( defects )
     {
@@ -1149,11 +1197,15 @@ cmCTestMemCheckHandler::PostProcessBoundsCheckerTest(cmCTestTestResult& res,
              << res.Name << std::endl);
   std::vector<std::string> files;
   this->TestOutputFileNames(test, files);
-  if ( files.size() == 0 )
+  if (files.empty())
     {
     return;
     }
   std::string ofile = files[0];
+  if ( ofile.empty() )
+    {
+    return;
+    }
   // put a scope around this to close ifs so the file can be removed
   {
   cmsys::ifstream ifs(ofile.c_str());
@@ -1173,10 +1225,10 @@ cmCTestMemCheckHandler::PostProcessBoundsCheckerTest(cmCTestTestResult& res,
     }
   }
   cmSystemTools::Delay(1000);
-  cmSystemTools::RemoveFile(this->BoundsCheckerDPBDFile.c_str());
+  cmSystemTools::RemoveFile(this->BoundsCheckerDPBDFile);
   cmCTestLog(this->CTest, HANDLER_VERBOSE_OUTPUT, "Remove: "
     << this->BoundsCheckerDPBDFile << std::endl);
-  cmSystemTools::RemoveFile(this->BoundsCheckerXMLFile.c_str());
+  cmSystemTools::RemoveFile(this->BoundsCheckerXMLFile);
   cmCTestLog(this->CTest, HANDLER_VERBOSE_OUTPUT, "Remove: "
     << this->BoundsCheckerXMLFile << std::endl);
 }
@@ -1207,7 +1259,7 @@ cmCTestMemCheckHandler::AppendMemTesterOutput(cmCTestTestResult& res,
   }
   if(this->LogWithPID)
     {
-    cmSystemTools::RemoveFile(ofile.c_str());
+    cmSystemTools::RemoveFile(ofile);
     cmCTestLog(this->CTest, HANDLER_VERBOSE_OUTPUT, "Remove: "<< ofile <<"\n");
     }
 }
@@ -1217,7 +1269,7 @@ void cmCTestMemCheckHandler::TestOutputFileNames(int test,
                                                  files)
 {
   std::string index;
-  cmOStringStream stream;
+  std::ostringstream stream;
   stream << test;
   index = stream.str();
   std::string ofile = this->MemoryTesterOutputFile;
@@ -1228,7 +1280,7 @@ void cmCTestMemCheckHandler::TestOutputFileNames(int test,
     ofile += ".*";
     cmsys::Glob g;
     g.FindFiles(ofile);
-    if(g.GetFiles().size() == 0)
+    if(g.GetFiles().empty())
       {
       std::string log = "Cannot find memory tester output file: "
         + ofile;

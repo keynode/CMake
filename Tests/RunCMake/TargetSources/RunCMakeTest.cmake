@@ -8,3 +8,5 @@ else()
 endif()
 
 run_cmake(CMP0026-LOCATION)
+run_cmake(RelativePathInInterface)
+run_cmake(ExportBuild)

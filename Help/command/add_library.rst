@@ -35,7 +35,7 @@ variable :variable:`BUILD_SHARED_LIBS` is ``ON``.  For ``SHARED`` and
 property is set to ``ON`` automatically.
 
 By default the library file will be created in the build tree directory
-corresponding to the source tree directory in which thecommand was
+corresponding to the source tree directory in which the command was
 invoked.  See documentation of the :prop_tgt:`ARCHIVE_OUTPUT_DIRECTORY`,
 :prop_tgt:`LIBRARY_OUTPUT_DIRECTORY`, and
 :prop_tgt:`RUNTIME_OUTPUT_DIRECTORY` target properties to change this
@@ -133,14 +133,17 @@ Creates an :ref:`Interface Library <Interface Libraries>`.  An ``INTERFACE``
 library target does not directly create build output, though it may
 have properties set on it and it may be installed, exported and
 imported. Typically the ``INTERFACE_*`` properties are populated on
-the interface target using the :command:`set_property`,
-:command:`target_link_libraries(INTERFACE)`,
-:command:`target_include_directories(INTERFACE)`,
-:command:`target_compile_options(INTERFACE)`,
-:command:`target_compile_definitions(INTERFACE)`,
-and :command:`target_sources(INTERFACE)` commands, and then it
-is used as an argument to :command:`target_link_libraries` like any other
-target.
+the interface target using the commands:
+
+* :command:`set_property`,
+* :command:`target_link_libraries(INTERFACE)`,
+* :command:`target_include_directories(INTERFACE)`,
+* :command:`target_compile_options(INTERFACE)`,
+* :command:`target_compile_definitions(INTERFACE)`, and
+* :command:`target_sources(INTERFACE)`,
+
+and then it is used as an argument to :command:`target_link_libraries`
+like any other target.
 
 An ``INTERFACE`` :ref:`Imported Target <Imported Targets>` may also be
 created with this signature.  An ``IMPORTED`` library target references a

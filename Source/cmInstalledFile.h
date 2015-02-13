@@ -13,6 +13,7 @@
 #define cmInstalledFile_h
 
 #include "cmGeneratorExpression.h"
+#include "cmAlgorithms.h"
 
 /** \class cmInstalledFile
  * \brief Represents a file intended for installation.
@@ -38,11 +39,7 @@ public:
 
     ~Property()
     {
-      for(ExpressionVectorType::iterator i = ValueExpressions.begin();
-        i != ValueExpressions.end(); ++i)
-        {
-        delete *i;
-        }
+      cmDeleteAll(this->ValueExpressions);
     }
 
     ExpressionVectorType ValueExpressions;
@@ -62,9 +59,14 @@ public:
   void AppendProperty(cmMakefile const* mf,
     const std::string& prop, const char* value,bool asString=false);
 
+  bool HasProperty(const std::string& prop) const;
+
   bool GetProperty(const std::string& prop, std::string& value) const;
 
   bool GetPropertyAsBool(const std::string& prop) const;
+
+  void GetPropertyAsList(const std::string& prop,
+    std::vector<std::string>& list) const;
 
   void SetName(cmMakefile* mf, const std::string& name);
 

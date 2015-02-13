@@ -30,7 +30,7 @@ bool cmParseGTMCoverage::LoadCoverageData(const char* d)
     {
     std::string file = dir.GetFile(i);
     if(file != "." && file != ".."
-       && !cmSystemTools::FileIsDirectory(file.c_str()))
+       && !cmSystemTools::FileIsDirectory(file))
       {
       std::string path = d;
       path += "/";
@@ -80,7 +80,7 @@ bool cmParseGTMCoverage::ReadMCovFile(const char* file)
     // no need to search the file if we just did it
     if(function == lastfunction && lastroutine == routine)
       {
-      if(lastpath.size())
+      if(!lastpath.empty())
         {
         this->Coverage.TotalCoverage[lastpath][lastoffset + linenumber]
           += count;

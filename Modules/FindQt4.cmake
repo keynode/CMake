@@ -23,7 +23,7 @@
 # .. note::
 #
 #  When using :prop_tgt:`IMPORTED` targets, the qtmain.lib static library is
-#  automatically linked on Windows for :variable:`WIN32 <WIN32_EXECUTABLE>`
+#  automatically linked on Windows for :prop_tgt:`WIN32 <WIN32_EXECUTABLE>`
 #  executables. To disable that globally, set the
 #  ``QT4_NO_LINK_QTMAIN`` variable before finding Qt4. To disable that
 #  for a particular executable, set the ``QT4_NO_LINK_QTMAIN`` target
@@ -104,19 +104,23 @@
 #   macro QT4_ADD_DBUS_INTERFACES(outfiles inputfile ... )
 #         Create the interface header and implementation files
 #         for all listed interface xml files.
-#         The basename will be automatically determined from the name of the xml file.
+#         The basename will be automatically determined from the name
+#         of the xml file.
 #
-#         The source file properties described for QT4_ADD_DBUS_INTERFACE also apply here.
+#         The source file properties described for
+#         QT4_ADD_DBUS_INTERFACE also apply here.
 #
 #
 # ::
 #
-#   macro QT4_ADD_DBUS_ADAPTOR(outfiles xmlfile parentheader parentclassname [basename] [classname])
+#   macro QT4_ADD_DBUS_ADAPTOR(outfiles xmlfile parentheader parentclassname
+#                              [basename] [classname])
 #         create a dbus adaptor (header and implementation file) from the xml file
 #         describing the interface, and add it to the list of sources. The adaptor
 #         forwards the calls to a parent class, defined in parentheader and named
 #         parentclassname. The name of the generated files will be
-#         <basename>adaptor.{cpp,h} where basename defaults to the basename of the xml file.
+#         <basename>adaptor.{cpp,h} where basename defaults to the basename of the
+#         xml file.
 #         If <classname> is provided, then it will be used as the classname of the
 #         adaptor itself.
 #
@@ -128,7 +132,8 @@
 #         If the optional argument interfacename is omitted, the name of the
 #         interface file is constructed from the basename of the header with
 #         the suffix .xml appended.
-#         Options may be given to qdbuscpp2xml, such as those found when executing "qdbuscpp2xml --help"
+#         Options may be given to qdbuscpp2xml, such as those found when
+#         executing "qdbuscpp2xml --help"
 #
 #
 # ::
@@ -169,11 +174,12 @@
 #         a class uses the Q_OBJECT macro, moc has to run on it. If you don't
 #         want to use QT4_WRAP_CPP() (which is reliable and mature), you can insert
 #         #include "foo.moc"
-#         in foo.cpp and then give foo.cpp as argument to QT4_AUTOMOC(). This will the
-#         scan all listed files at cmake-time for such included moc files and if it finds
-#         them cause a rule to be generated to run moc at build time on the
+#         in foo.cpp and then give foo.cpp as argument to QT4_AUTOMOC(). This will
+#         scan all listed files at cmake-time for such included moc files and if it
+#         finds them cause a rule to be generated to run moc at build time on the
 #         accompanying header file foo.h.
-#         If a source file has the SKIP_AUTOMOC property set it will be ignored by this macro.
+#         If a source file has the SKIP_AUTOMOC property set it will be ignored by
+#         this macro.
 #         If the <tgt> is specified, the INTERFACE_INCLUDE_DIRECTORIES and
 #         INTERFACE_COMPILE_DEFINITIONS from the <tgt> are passed to moc.
 #
@@ -181,16 +187,17 @@
 # ::
 #
 #  function QT4_USE_MODULES( target [link_type] modules...)
-#         This function is obsolete. Use target_link_libraries with IMPORTED targets instead.
+#         This function is obsolete. Use target_link_libraries with IMPORTED targets
+#         instead.
 #         Make <target> use the <modules> from Qt. Using a Qt module means
-#         to link to the library, add the relevant include directories for the module,
-#         and add the relevant compiler defines for using the module.
+#         to link to the library, add the relevant include directories for the
+#         module, and add the relevant compiler defines for using the module.
 #         Modules are roughly equivalent to components of Qt4, so usage would be
 #         something like:
 #          qt4_use_modules(myexe Core Gui Declarative)
-#         to use QtCore, QtGui and QtDeclarative. The optional <link_type> argument can
-#         be specified as either LINK_PUBLIC or LINK_PRIVATE to specify the same argument
-#         to the target_link_libraries call.
+#         to use QtCore, QtGui and QtDeclarative. The optional <link_type> argument
+#         can be specified as either LINK_PUBLIC or LINK_PRIVATE to specify the
+#         same argument to the target_link_libraries call.
 #
 #
 # IMPORTED Targets
@@ -1314,7 +1321,7 @@ endif()
 
 if (NOT QT_VERSION_MAJOR EQUAL 4)
     set(VERSION_MSG "Found unsuitable Qt version \"${QTVERSION}\" from ${QT_QMAKE_EXECUTABLE}")
-    set(QT4_FOUND FALSE)
+    set(Qt4_FOUND FALSE)
     if(Qt4_FIND_REQUIRED)
        message( FATAL_ERROR "${VERSION_MSG}, this code requires Qt 4.x")
     else()

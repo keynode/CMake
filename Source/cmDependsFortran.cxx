@@ -319,17 +319,13 @@ void cmDependsFortran::LocateModules()
       infoI != objInfo.end(); ++infoI)
     {
     cmDependsFortranSourceInfo const& info = infoI->second;
-    for(std::set<std::string>::const_iterator i = info.Provides.begin();
-        i != info.Provides.end(); ++i)
-      {
-      // Include this module in the set provided by this target.
-      this->Internal->TargetProvides.insert(*i);
-      }
+    // Include this module in the set provided by this target.
+    this->Internal->TargetProvides.insert(info.Provides.begin(),
+                                          info.Provides.end());
 
     for(std::set<std::string>::const_iterator i = info.Requires.begin();
         i != info.Requires.end(); ++i)
       {
-      // Include this module in the set required by this target.
       this->Internal->TargetRequires[*i] = "";
       }
     }
@@ -668,7 +664,7 @@ bool cmDependsFortran::CopyModule(const std::vector<std::string>& args)
     if(cmDependsFortran::ModulesDiffer(mod_upper.c_str(), stamp.c_str(),
                                        compilerId.c_str()))
       {
-      if(!cmSystemTools::CopyFileAlways(mod_upper.c_str(), stamp.c_str()))
+      if(!cmSystemTools::CopyFileAlways(mod_upper, stamp))
         {
         std::cerr << "Error copying Fortran module from \""
                   << mod_upper << "\" to \"" << stamp
@@ -683,7 +679,7 @@ bool cmDependsFortran::CopyModule(const std::vector<std::string>& args)
     if(cmDependsFortran::ModulesDiffer(mod_lower.c_str(), stamp.c_str(),
                                        compilerId.c_str()))
       {
-      if(!cmSystemTools::CopyFileAlways(mod_lower.c_str(), stamp.c_str()))
+      if(!cmSystemTools::CopyFileAlways(mod_lower, stamp))
         {
         std::cerr << "Error copying Fortran module from \""
                   << mod_lower << "\" to \"" << stamp
