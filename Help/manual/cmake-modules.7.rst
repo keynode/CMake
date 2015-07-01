@@ -127,7 +127,6 @@ All Modules
    /module/FindJava
    /module/FindJNI
    /module/FindJPEG
-   /module/FindJsonCpp
    /module/FindKDE3
    /module/FindKDE4
    /module/FindLAPACK
@@ -213,6 +212,7 @@ All Modules
    /module/FindWish
    /module/FindwxWidgets
    /module/FindwxWindows
+   /module/FindXCTest
    /module/FindXercesC
    /module/FindX11
    /module/FindXMLRPC

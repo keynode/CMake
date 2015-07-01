@@ -26,6 +26,39 @@ macro(add_RunCMake_test test)
     )
 endmacro()
 
+function(add_RunCMake_test_group test types)
+  # create directory for common content
+  set(TEST_CONFIG_DIR "${CMAKE_CURRENT_BINARY_DIR}/${test}/conf")
+  file(REMOVE_RECURSE "${TEST_CONFIG_DIR}")
+  file(MAKE_DIRECTORY "${TEST_CONFIG_DIR}")
+
+  foreach(type IN LISTS types)
+    # generate prerequirements config file in cmake as ctest doesn't have as
+    # much system information so it is easier to set programs and environment
+    # values here
+    unset(${test}_${type}_FOUND_PREREQUIREMENTS)
+    include("${CMAKE_CURRENT_SOURCE_DIR}/${test}/${type}/Prerequirements.cmake")
+    get_test_prerequirements("${test}_${type}_FOUND_PREREQUIREMENTS"
+        "${TEST_CONFIG_DIR}/${type}_config.cmake")
+
+    # only add the test if prerequirements are met
+    if(${test}_${type}_FOUND_PREREQUIREMENTS)
+      add_test(NAME RunCMake.${test}_${type} COMMAND ${CMAKE_CMAKE_COMMAND}
+        -DTEST_TYPE=${type}
+        -DCMAKE_MODULE_PATH=${CMAKE_CURRENT_SOURCE_DIR}
+        -DRunCMake_GENERATOR=${CMAKE_GENERATOR}
+        -DRunCMake_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}
+        -DRunCMake_GENERATOR_TOOLSET=${CMAKE_GENERATOR_TOOLSET}
+        -DRunCMake_MAKE_PROGRAM=${CMake_TEST_EXPLICIT_MAKE_PROGRAM}
+        -DRunCMake_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/${test}
+        -DRunCMake_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/${type}/${test}
+        -Dconfig_file=${TEST_CONFIG_DIR}/${type}_config.cmake
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/${test}/RunCMakeTest.cmake"
+        )
+    endif()
+  endforeach()
+endfunction()
+
 if(XCODE_VERSION AND "${XCODE_VERSION}" VERSION_LESS 3)
   set(GeneratorToolset_ARGS -DXCODE_BELOW_3=1)
 endif()
@@ -63,11 +96,16 @@ add_RunCMake_test(CMP0051)
 add_RunCMake_test(CMP0053)
 add_RunCMake_test(CMP0054)
 add_RunCMake_test(CMP0055)
+add_RunCMake_test(CMP0057)
+add_RunCMake_test(CMP0059)
+add_RunCMake_test(CMP0060)
+if(CMAKE_GENERATOR STREQUAL "Ninja")
+  add_RunCMake_test(Ninja)
+endif()
 add_RunCMake_test(CTest)
-add_RunCMake_test(CTestSubmit)
 
 if(NOT CMake_TEST_EXTERNAL_CMAKE)
-  add_RunCMake_test(CTestMemcheck
+  add_RunCMake_test(ctest_memcheck
     -DPSEUDO_BC=$<TARGET_FILE:pseudo_BC>
     -DPSEUDO_PURIFY=$<TARGET_FILE:pseudo_purify>
     -DPSEUDO_VALGRIND=$<TARGET_FILE:pseudo_valgrind>
@@ -90,6 +128,7 @@ add_RunCMake_test(FPHSA)
 add_RunCMake_test(GeneratorExpression)
 add_RunCMake_test(GeneratorPlatform)
 add_RunCMake_test(GeneratorToolset)
+add_RunCMake_test(GNUInstallDirs)
 add_RunCMake_test(TargetPropertyGeneratorExpressions)
 add_RunCMake_test(Languages)
 add_RunCMake_test(ObjectLibrary)
@@ -100,22 +139,9 @@ add_RunCMake_test(CompileFeatures)
 add_RunCMake_test(WriteCompilerDetectionHeader)
 if(NOT WIN32)
   add_RunCMake_test(PositionIndependentCode)
-  set(SKIP_VISIBILITY 0)
-  if("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU" AND "${CMAKE_CXX_COMPILER_VERSION}" VERSION_LESS 4.2)
-    set(SKIP_VISIBILITY 1)
-  endif()
-
-  if (CMAKE_CXX_COMPILER_ID MATCHES Watcom
-      OR CMAKE_SYSTEM_NAME MATCHES IRIX64
-      OR CMAKE_CXX_COMPILER_ID MATCHES HP
-      OR CMAKE_CXX_COMPILER_ID MATCHES XL
-      OR CMAKE_CXX_COMPILER_ID MATCHES SunPro)
-    set(SKIP_VISIBILITY 1)
-  endif()
-
-  if (NOT SKIP_VISIBILITY)
-    add_RunCMake_test(VisibilityPreset)
-  endif()
+endif()
+if(NOT CMAKE_GENERATOR MATCHES "Visual Studio")
+  add_RunCMake_test(VisibilityPreset)
 endif()
 if (QT4_FOUND)
   set(CompatibleInterface_ARGS -DQT_QMAKE_EXECUTABLE:FILEPATH=${QT_QMAKE_EXECUTABLE})
@@ -127,12 +153,24 @@ add_RunCMake_test(add_custom_command)
 add_RunCMake_test(add_custom_target)
 add_RunCMake_test(add_dependencies)
 add_RunCMake_test(build_command)
+add_RunCMake_test(execute_process)
 add_RunCMake_test(export)
 add_RunCMake_test(cmake_minimum_required)
 add_RunCMake_test(continue)
+add_RunCMake_test(ctest_build)
+add_RunCMake_test(ctest_configure)
+if(COVERAGE_COMMAND)
+  add_RunCMake_test(ctest_coverage -DCOVERAGE_COMMAND=${COVERAGE_COMMAND})
+endif()
+add_RunCMake_test(ctest_start)
+add_RunCMake_test(ctest_submit)
+add_RunCMake_test(ctest_test)
+add_RunCMake_test(ctest_upload)
 add_RunCMake_test(file)
+add_RunCMake_test(find_file)
 add_RunCMake_test(find_library)
 add_RunCMake_test(find_package)
+add_RunCMake_test(find_path)
 add_RunCMake_test(get_filename_component)
 add_RunCMake_test(get_property)
 add_RunCMake_test(if)
@@ -174,7 +212,7 @@ if("${CMAKE_GENERATOR}" MATCHES "Visual Studio [^6]")
 endif()
 
 if(XCODE_VERSION AND NOT "${XCODE_VERSION}" VERSION_LESS 3)
-  add_RunCMake_test(XcodeProject)
+  add_RunCMake_test(XcodeProject -DXCODE_VERSION=${XCODE_VERSION})
 endif()
 
 add_RunCMake_test(File_Generate)
@@ -184,10 +222,17 @@ add_RunCMake_test(target_link_libraries)
 add_RunCMake_test(target_compile_features)
 add_RunCMake_test(CheckModules)
 add_RunCMake_test(CommandLine)
+add_RunCMake_test(CommandLineTar)
 
 add_RunCMake_test(install)
 add_RunCMake_test(CPackInstallProperties)
 add_RunCMake_test(ExternalProject)
+add_RunCMake_test(CTestCommandLine)
+# Only run this test on unix platforms that support
+# symbolic links
+if(UNIX)
+  add_RunCMake_test(CPackSymlinks)
+endif()
 
 set(IfacePaths_INCLUDE_DIRECTORIES_ARGS -DTEST_PROP=INCLUDE_DIRECTORIES)
 add_RunCMake_test(IfacePaths_INCLUDE_DIRECTORIES TEST_DIR IfacePaths)
@@ -195,6 +240,29 @@ add_RunCMake_test(IfacePaths_INCLUDE_DIRECTORIES TEST_DIR IfacePaths)
 set(IfacePaths_SOURCES_ARGS -DTEST_PROP=SOURCES)
 add_RunCMake_test(IfacePaths_SOURCES TEST_DIR IfacePaths)
 
-if(RPMBUILD_EXECUTABLE)
-  add_RunCMake_test(CPackRPM)
+add_RunCMake_test(COMPILE_LANGUAGE-genex)
+
+# Matlab module related tests
+if(CMake_TEST_FindMatlab)
+  add_RunCMake_test(FindMatlab)
 endif()
+
+add_executable(pseudo_emulator pseudo_emulator.c)
+add_RunCMake_test(CrosscompilingEmulator
+ -DPSEUDO_EMULATOR=$<TARGET_FILE:pseudo_emulator>)
+# Xcode 2.x forgets to create the output directory before linking
+# the individual architectures.
+if(CMAKE_OSX_ARCHITECTURES AND XCODE AND NOT "${XCODE_VERSION}" MATCHES "^[^12]")
+  add_custom_command(
+    TARGET pseudo_emulator
+    PRE_BUILD COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CFG_INTDIR}"
+    )
+endif()
+
+if("${CMAKE_GENERATOR}" MATCHES "Make|Ninja")
+  add_executable(pseudo_iwyu pseudo_iwyu.c)
+  add_RunCMake_test(IncludeWhatYouUse -DPSEUDO_IWYU=$<TARGET_FILE:pseudo_iwyu>)
+  add_RunCMake_test(CompilerLauncher)
+endif()
+
+add_RunCMake_test_group(CPack "DEB;RPM")

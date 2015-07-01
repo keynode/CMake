@@ -74,6 +74,7 @@ cmake_sphinx_man=""
 cmake_sphinx_html=""
 cmake_sphinx_qthelp=""
 cmake_sphinx_build=""
+cmake_sphinx_flags=""
 
 # Determine whether this is a Cygwin environment.
 if echo "${cmake_system}" | grep CYGWIN >/dev/null 2>&1; then
@@ -264,15 +265,19 @@ CMAKE_CXX_SOURCES="\
   cmExportTryCompileFileGenerator \
   cmExportSet \
   cmExportSetMap \
-  cmInstallDirectoryGenerator \
+  cmExternalMakefileProjectGenerator \
+  cmGeneratorExpressionEvaluationFile \
   cmGeneratedFileStream \
   cmGeneratorTarget \
+  cmGeneratorExpressionContext \
   cmGeneratorExpressionDAGChecker \
   cmGeneratorExpressionEvaluator \
   cmGeneratorExpressionLexer \
+  cmGeneratorExpressionNode \
   cmGeneratorExpressionParser \
   cmGeneratorExpression \
   cmGlobalGenerator \
+  cmInstallDirectoryGenerator \
   cmLocalGenerator \
   cmInstalledFile \
   cmInstallGenerator \
@@ -283,6 +288,7 @@ CMAKE_CXX_SOURCES="\
   cmScriptGenerator \
   cmSourceFile \
   cmSourceFileLocation \
+  cmState \
   cmSystemTools \
   cmTestGenerator \
   cmVersion \
@@ -293,6 +299,7 @@ CMAKE_CXX_SOURCES="\
   cmMakefileLibraryTargetGenerator \
   cmMakefileTargetGenerator \
   cmMakefileUtilityTargetGenerator \
+  cmOutputConverter \
   cmOSXBundleGenerator \
   cmNewLineStyle \
   cmBootstrapCommands1 \
@@ -401,6 +408,8 @@ Configuration:
   --no-system-curl        use cmake-provided curl library (default)
   --system-expat          use system-installed expat library
   --no-system-expat       use cmake-provided expat library (default)
+  --system-jsoncpp        use system-installed jsoncpp library
+  --no-system-jsoncpp     use cmake-provided jsoncpp library (default)
   --system-zlib           use system-installed zlib library
   --no-system-zlib        use cmake-provided zlib library (default)
   --system-bzip2          use system-installed bzip2 library
@@ -416,6 +425,7 @@ Configuration:
   --sphinx-html           build html help with Sphinx
   --sphinx-qthelp         build qch help with Sphinx
   --sphinx-build=<sb>     use <sb> as the sphinx-build executable
+  --sphinx-flags=<flags>  pass <flags> to sphinx-build executable
 
 Directory and file names:
   --prefix=PREFIX         install files in tree rooted at PREFIX
@@ -640,10 +650,10 @@ while test $# != 0; do
   --init=*) cmake_init_file=`cmake_arg "$1"` ;;
   --system-libs) cmake_bootstrap_system_libs="${cmake_bootstrap_system_libs} -DCMAKE_USE_SYSTEM_LIBRARIES=1" ;;
   --no-system-libs) cmake_bootstrap_system_libs="${cmake_bootstrap_system_libs} -DCMAKE_USE_SYSTEM_LIBRARIES=0" ;;
-  --system-bzip2|--system-curl|--system-expat|--system-libarchive|--system-zlib)
+  --system-bzip2|--system-curl|--system-expat|--system-jsoncpp|--system-libarchive|--system-zlib)
     lib=`cmake_arg "$1" "--system-"`
     cmake_bootstrap_system_libs="${cmake_bootstrap_system_libs} -DCMAKE_USE_SYSTEM_LIBRARY_`cmake_toupper $lib`=1" ;;
-  --no-system-bzip2|--no-system-curl|--no-system-expat|--no-system-libarchive|--no-system-zlib)
+  --no-system-bzip2|--no-system-curl|--no-system-expat|--no-system-jsoncpp|--no-system-libarchive|--no-system-zlib)
     lib=`cmake_arg "$1" "--no-system-"`
     cmake_bootstrap_system_libs="${cmake_bootstrap_system_libs} -DCMAKE_USE_SYSTEM_LIBRARY_`cmake_toupper $lib`=0" ;;
   --qt-gui) cmake_bootstrap_qt_gui="1" ;;
@@ -653,6 +663,7 @@ while test $# != 0; do
   --sphinx-html) cmake_sphinx_html="1" ;;
   --sphinx-qthelp) cmake_sphinx_qthelp="1" ;;
   --sphinx-build=*) cmake_sphinx_build=`cmake_arg "$1"` ;;
+  --sphinx-flags=*) cmake_sphinx_flags=`cmake_arg "$1"` ;;
   --help) cmake_usage ;;
   --version) cmake_version_display ; exit 2 ;;
   --verbose) cmake_verbose=TRUE ;;
@@ -1659,22 +1670,27 @@ set (QT_QMAKE_EXECUTABLE "'"${cmake_bootstrap_qt_qmake}"'" CACHE FILEPATH "Locat
 fi
 if [ "x${cmake_sphinx_man}" != "x" ]; then
   echo '
-set (SPHINX_MAN "'"${cmake_sphinx_man}"'" CACHE FILEPATH "Build man pages with Sphinx" FORCE)
+set (SPHINX_MAN "'"${cmake_sphinx_man}"'" CACHE BOOL "Build man pages with Sphinx" FORCE)
 ' >> "${cmake_bootstrap_dir}/InitialCacheFlags.cmake"
 fi
 if [ "x${cmake_sphinx_html}" != "x" ]; then
   echo '
-set (SPHINX_HTML "'"${cmake_sphinx_html}"'" CACHE FILEPATH "Build html help with Sphinx" FORCE)
+set (SPHINX_HTML "'"${cmake_sphinx_html}"'" CACHE BOOL "Build html help with Sphinx" FORCE)
 ' >> "${cmake_bootstrap_dir}/InitialCacheFlags.cmake"
 fi
 if [ "x${cmake_sphinx_qthelp}" != "x" ]; then
   echo '
-set (SPHINX_QTHELP "'"${cmake_sphinx_qthelp}"'" CACHE FILEPATH "Build qch help with Sphinx" FORCE)
+set (SPHINX_QTHELP "'"${cmake_sphinx_qthelp}"'" CACHE BOOL "Build qch help with Sphinx" FORCE)
 ' >> "${cmake_bootstrap_dir}/InitialCacheFlags.cmake"
 fi
 if [ "x${cmake_sphinx_build}" != "x" ]; then
   echo '
 set (SPHINX_EXECUTABLE "'"${cmake_sphinx_build}"'" CACHE FILEPATH "Location of Qt sphinx-build" FORCE)
+' >> "${cmake_bootstrap_dir}/InitialCacheFlags.cmake"
+fi
+if [ "x${cmake_sphinx_flags}" != "x" ]; then
+  echo '
+set (SPHINX_FLAGS [==['"${cmake_sphinx_flags}"']==] CACHE STRING "Flags to pass to sphinx-build" FORCE)
 ' >> "${cmake_bootstrap_dir}/InitialCacheFlags.cmake"
 fi
 

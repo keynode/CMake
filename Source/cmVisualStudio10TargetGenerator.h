@@ -69,6 +69,7 @@ private:
   void WriteEmbeddedResourceGroup();
   void WriteWinRTReferences();
   void WriteWinRTPackageCertificateKeyFile();
+  void WriteXamlFilesGroup();
   void WritePathAndIncrementalLinkOptions();
   void WriteItemDefinitionGroups();
 	void WriteUserMacros();
@@ -120,6 +121,8 @@ private:
   void AddMissingSourceGroups(std::set<cmSourceGroup*>& groupsUsed,
                               const std::vector<cmSourceGroup>& allGroups);
   bool IsResxHeader(const std::string& headerFile);
+  bool IsXamlHeader(const std::string& headerFile);
+  bool IsXamlSource(const std::string& headerFile);
 
   cmIDEFlagTable const* GetClFlagTable() const;
   cmIDEFlagTable const* GetRcFlagTable() const;
@@ -135,6 +138,7 @@ private:
   OptionsMap MasmOptions;
   OptionsMap LinkOptions;
   std::string PathToVcxproj;
+  std::vector<std::string> Configurations;
   cmTarget* Target;
   cmGeneratorTarget* GeneratorTarget;
   cmMakefile* Makefile;

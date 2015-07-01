@@ -13,10 +13,10 @@
 
 #include "cmComputeComponentGraph.h"
 #include "cmGlobalGenerator.h"
-#include "cmLocalGenerator.h"
 #include "cmMakefile.h"
 #include "cmTarget.h"
 #include "cmake.h"
+#include "cmAlgorithms.h"
 
 #include <cmsys/stl/algorithm>
 
@@ -178,8 +178,7 @@ cmComputeLinkDepends
   // Store context information.
   this->Target = target;
   this->Makefile = this->Target->GetMakefile();
-  this->LocalGenerator = this->Makefile->GetLocalGenerator();
-  this->GlobalGenerator = this->LocalGenerator->GetGlobalGenerator();
+  this->GlobalGenerator = this->Makefile->GetGlobalGenerator();
   this->CMakeInstance = this->GlobalGenerator->GetCMakeInstance();
 
   // The configuration being linked.
@@ -705,10 +704,7 @@ void cmComputeLinkDepends::DisplayConstraintGraph()
     {
     EdgeList const& nl = this->EntryConstraintGraph[i];
     e << "item " << i << " is [" << this->EntryList[i].Item << "]\n";
-    for(EdgeList::const_iterator j = nl.begin(); j != nl.end(); ++j)
-      {
-      e << "  item " << *j << " must follow it\n";
-      }
+    e << cmWrap("  item ", nl, " must follow it", "\n") << "\n";
     }
   fprintf(stderr, "%s\n", e.str().c_str());
 }

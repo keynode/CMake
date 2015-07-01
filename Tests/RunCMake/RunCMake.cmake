@@ -51,15 +51,27 @@ function(run_cmake test)
   if(APPLE)
     list(APPEND RunCMake_TEST_OPTIONS -DCMAKE_POLICY_DEFAULT_CMP0025=NEW)
   endif()
+  if(RunCMake_GENERATOR STREQUAL "Visual Studio 6" AND NOT RunCMake_WARN_VS6)
+    list(APPEND RunCMake_TEST_OPTIONS -DCMAKE_WARN_VS6=OFF)
+  endif()
+  if(RunCMake_GENERATOR STREQUAL "Visual Studio 7" AND NOT RunCMake_WARN_VS70)
+    list(APPEND RunCMake_TEST_OPTIONS -DCMAKE_WARN_VS70=OFF)
+  endif()
   if(RunCMake_MAKE_PROGRAM)
     list(APPEND RunCMake_TEST_OPTIONS "-DCMAKE_MAKE_PROGRAM=${RunCMake_MAKE_PROGRAM}")
+  endif()
+  if(RunCMake_TEST_OUTPUT_MERGE)
+    set(actual_stderr_var actual_stdout)
+    set(actual_stderr "")
+  else()
+    set(actual_stderr_var actual_stderr)
   endif()
   if(RunCMake_TEST_COMMAND)
     execute_process(
       COMMAND ${RunCMake_TEST_COMMAND}
       WORKING_DIRECTORY "${RunCMake_TEST_BINARY_DIR}"
       OUTPUT_VARIABLE actual_stdout
-      ERROR_VARIABLE actual_stderr
+      ERROR_VARIABLE ${actual_stderr_var}
       RESULT_VARIABLE actual_result
       )
   else()
@@ -73,7 +85,7 @@ function(run_cmake test)
                 ${RunCMake_TEST_OPTIONS}
       WORKING_DIRECTORY "${RunCMake_TEST_BINARY_DIR}"
       OUTPUT_VARIABLE actual_stdout
-      ERROR_VARIABLE actual_stderr
+      ERROR_VARIABLE ${actual_stderr_var}
       RESULT_VARIABLE actual_result
       )
   endif()
@@ -83,7 +95,7 @@ function(run_cmake test)
   endif()
   foreach(o out err)
     string(REGEX REPLACE "\r\n" "\n" actual_std${o} "${actual_std${o}}")
-    string(REGEX REPLACE "(^|\n)(==[0-9]+==[^\n]*\n)+" "\\1" actual_std${o} "${actual_std${o}}")
+    string(REGEX REPLACE "(^|\n)((==[0-9]+==|BullseyeCoverage|[a-z]+\\([0-9]+\\) malloc:|Error kstat returned)[^\n]*\n)+" "\\1" actual_std${o} "${actual_std${o}}")
     string(REGEX REPLACE "\n+$" "" actual_std${o} "${actual_std${o}}")
     set(expect_${o} "")
     if(DEFINED expect_std${o})
@@ -123,3 +135,6 @@ function(run_cmake_command test)
   set(RunCMake_TEST_COMMAND "${ARGN}")
   run_cmake(${test})
 endfunction()
+
+# Protect RunCMake tests from calling environment.
+unset(ENV{MAKEFLAGS})

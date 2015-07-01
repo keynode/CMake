@@ -15,6 +15,7 @@
 #include "cmGlobalGenerator.h"
 #include "cmQtAutoGenerators.h"
 #include "cmVersion.h"
+#include "cmAlgorithms.h"
 
 #if defined(CMAKE_BUILD_WITH_CMAKE)
 # include "cmDependsFortran.h" // For -E cmake_copy_f90_mod callback.
@@ -210,30 +211,99 @@ int cmcmd::ExecuteCMakeCommand(std::vector<std::string>& args)
       return 0;
       }
 
+    // run include what you use command and then run the compile
+    // command. This is an internal undocumented option and should
+    // only be used by CMake itself when running iwyu.
+    else if (args[1] == "__run_iwyu")
+      {
+      if (args.size() < 3)
+        {
+        std::cerr << "__run_iwyu Usage: -E __run_iwyu [--iwyu=/path/iwyu]"
+          " -- compile command\n";
+        return 1;
+        }
+      bool doing_options = true;
+      std::vector<std::string> orig_cmd;
+      std::string iwyu;
+      for (std::string::size_type cc = 2; cc < args.size(); cc ++)
+        {
+        std::string const& arg = args[cc];
+        if (arg == "--")
+          {
+          doing_options = false;
+          }
+        else if (doing_options && cmHasLiteralPrefix(arg, "--iwyu="))
+          {
+          iwyu = arg.substr(7);
+          }
+        else if (doing_options)
+          {
+          std::cerr << "__run_iwyu given unknown argument: " << arg << "\n";
+          return 1;
+          }
+        else
+          {
+          orig_cmd.push_back(arg);
+          }
+        }
+      if (iwyu.empty())
+        {
+        std::cerr << "__run_iwyu missing --iwyu=\n";
+        return 1;
+        }
+      if (orig_cmd.empty())
+        {
+        std::cerr << "__run_iwyu missing compile command after --\n";
+        return 1;
+        }
+
+      // Construct the iwyu command line by taking what was given
+      // and adding all the arguments we give to the compiler.
+      std::vector<std::string> iwyu_cmd;
+      cmSystemTools::ExpandListArgument(iwyu, iwyu_cmd, true);
+      iwyu_cmd.insert(iwyu_cmd.end(), orig_cmd.begin()+1, orig_cmd.end());
+
+      // Run the iwyu command line.  Capture its stderr and hide its stdout.
+      int ret = 0;
+      std::string stdErr;
+      if(!cmSystemTools::RunSingleCommand(iwyu_cmd, 0, &stdErr, &ret,
+                                          0, cmSystemTools::OUTPUT_NONE))
+        {
+        std::cerr << "Error running '" << iwyu_cmd[0] << "': "
+                  << stdErr << "\n";
+        return 1;
+        }
+
+      // Warn if iwyu reported anything.
+      if(stdErr.find("should remove these lines:") != stdErr.npos
+         || stdErr.find("should add these lines:") != stdErr.npos)
+        {
+        std::cerr << "Warning: include-what-you-use reported diagnostics:\n"
+                  << stdErr << "\n";
+        }
+
+      // Now run the real compiler command and return its result value.
+      if(!cmSystemTools::RunSingleCommand(orig_cmd, 0, &stdErr, &ret, 0,
+                                          cmSystemTools::OUTPUT_PASSTHROUGH))
+        {
+        std::cerr << "Error running '" << orig_cmd[0] << "': "
+                  << stdErr << "\n";
+        return 1;
+        }
+      return ret;
+      }
+
     // Echo string
     else if (args[1] == "echo" )
       {
-      unsigned int cc;
-      const char* space = "";
-      for ( cc = 2; cc < args.size(); cc ++ )
-        {
-        std::cout << space << args[cc];
-        space = " ";
-        }
-      std::cout << std::endl;
+      std::cout << cmJoin(cmRange(args).advance(2), " ") << std::endl;
       return 0;
       }
 
     // Echo string no new line
     else if (args[1] == "echo_append" )
       {
-      unsigned int cc;
-      const char* space = "";
-      for ( cc = 2; cc < args.size(); cc ++ )
-        {
-        std::cout << space << args[cc];
-        space = " ";
-        }
+      std::cout << cmJoin(cmRange(args).advance(2), " ");
       return 0;
       }
 
@@ -279,7 +349,7 @@ int cmcmd::ExecuteCMakeCommand(std::vector<std::string>& args)
       std::vector<std::string> cmd(ai, ae);
       int retval;
       if(cmSystemTools::RunSingleCommand(
-           cmd, 0, &retval, NULL, cmSystemTools::OUTPUT_PASSTHROUGH))
+           cmd, 0, 0, &retval, NULL, cmSystemTools::OUTPUT_PASSTHROUGH))
         {
         return retval;
         }
@@ -287,8 +357,6 @@ int cmcmd::ExecuteCMakeCommand(std::vector<std::string>& args)
       }
 
 #if defined(CMAKE_BUILD_WITH_CMAKE)
-    // Command to create a symbolic link.  Fails on platforms not
-    // supporting them.
     else if (args[1] == "environment" )
       {
       std::vector<std::string> env = cmSystemTools::GetEnvironmentVariables();
@@ -352,8 +420,6 @@ int cmcmd::ExecuteCMakeCommand(std::vector<std::string>& args)
       {
       for (std::string::size_type cc = 2; cc < args.size(); cc ++)
         {
-        // Complain if the file could not be removed, still exists,
-        // and the -f option was not given.
         if(!cmSystemTools::Touch(args[cc], true))
           {
           return 1;
@@ -414,7 +480,7 @@ int cmcmd::ExecuteCMakeCommand(std::vector<std::string>& args)
       time(&time_start);
       clock_start = clock();
       int ret =0;
-      cmSystemTools::RunSingleCommand(command.c_str(), 0, &ret);
+      cmSystemTools::RunSingleCommand(command.c_str(), 0, 0, &ret);
 
       clock_finish = clock();
       time(&time_finish);
@@ -467,12 +533,10 @@ int cmcmd::ExecuteCMakeCommand(std::vector<std::string>& args)
         return 1;
         }
 
-      std::string command = "\"";
-      command += cmJoin(cmRange(args).advance(3), "\" \"");
-      command += "\"";
+      std::string command = cmWrap('"', cmRange(args).advance(3), '"', " ");
       int retval = 0;
       int timeout = 0;
-      if ( cmSystemTools::RunSingleCommand(command.c_str(), 0, &retval,
+      if ( cmSystemTools::RunSingleCommand(command.c_str(), 0, 0, &retval,
              directory.c_str(), cmSystemTools::OUTPUT_NORMAL, timeout) )
         {
         return retval;
@@ -660,16 +724,13 @@ int cmcmd::ExecuteCMakeCommand(std::vector<std::string>& args)
       homeOutDir = cmSystemTools::CollapseFullPath(homeOutDir);
       startOutDir = cmSystemTools::CollapseFullPath(startOutDir);
       cm.SetHomeDirectory(homeDir);
-      cm.SetStartDirectory(startDir);
       cm.SetHomeOutputDirectory(homeOutDir);
-      cm.SetStartOutputDirectory(startOutDir);
       if(cmGlobalGenerator* ggd = cm.CreateGlobalGenerator(gen))
         {
         cm.SetGlobalGenerator(ggd);
-        cmsys::auto_ptr<cmLocalGenerator> lgd(ggd->CreateLocalGenerator());
-        lgd->GetMakefile()->SetStartDirectory(startDir);
-        lgd->GetMakefile()->SetStartOutputDirectory(startOutDir);
-        lgd->GetMakefile()->MakeStartDirectoriesCurrent();
+        cmsys::auto_ptr<cmLocalGenerator> lgd(ggd->MakeLocalGenerator());
+        lgd->GetMakefile()->SetCurrentSourceDirectory(startDir);
+        lgd->GetMakefile()->SetCurrentBinaryDirectory(startOutDir);
 
         // Actually scan dependencies.
         return lgd->UpdateDependencies(depInfo.c_str(),
@@ -721,10 +782,20 @@ int cmcmd::ExecuteCMakeCommand(std::vector<std::string>& args)
     // Tar files
     else if (args[1] == "tar" && args.size() > 3)
       {
+      const char* knownFormats[] =
+        {
+        "7zip",
+        "gnutar",
+        "pax",
+        "paxr",
+        "zip"
+        };
+
       std::string flags = args[2];
       std::string outFile = args[3];
       std::vector<std::string> files;
       std::string mtime;
+      std::string format;
       bool doing_options = true;
       for (std::string::size_type cc = 4; cc < args.size(); cc ++)
         {
@@ -744,6 +815,19 @@ int cmcmd::ExecuteCMakeCommand(std::vector<std::string>& args)
             std::string const& files_from = arg.substr(13);
             if (!cmTarFilesFrom(files_from, files))
               {
+              return 1;
+              }
+            }
+          else if (cmHasLiteralPrefix(arg, "--format="))
+            {
+            format = arg.substr(9);
+            bool isKnown = std::find(cmArrayBegin(knownFormats),
+              cmArrayEnd(knownFormats), format) != cmArrayEnd(knownFormats);
+
+            if(!isKnown)
+              {
+              cmSystemTools::Error("Unknown -E tar --format= argument: ",
+                format.c_str());
               return 1;
               }
             }
@@ -777,7 +861,13 @@ int cmcmd::ExecuteCMakeCommand(std::vector<std::string>& args)
         compress = cmSystemTools::TarCompressGZip;
         ++nCompress;
         }
-      if ( nCompress > 1 )
+      if ( (format == "7zip" || format == "zip") && nCompress > 0 )
+        {
+        cmSystemTools::Error("Can not use compression flags with format: ",
+          format.c_str());
+        return 1;
+        }
+      else if ( nCompress > 1 )
         {
         cmSystemTools::Error("Can only compress a tar file one way; "
                              "at most one flag of z, j, or J may be used");
@@ -799,7 +889,7 @@ int cmcmd::ExecuteCMakeCommand(std::vector<std::string>& args)
       else if ( flags.find_first_of('c') != flags.npos )
         {
         if ( !cmSystemTools::CreateTar(
-               outFile.c_str(), files, compress, verbose, mtime) )
+               outFile.c_str(), files, compress, verbose, mtime, format) )
           {
           cmSystemTools::Error("Problem creating tar: ", outFile.c_str());
           return 1;
@@ -1333,18 +1423,13 @@ bool cmcmd::RunCommand(const char* comment,
   if(verbose)
     {
     std::cout << comment << ":\n";
-    for(std::vector<std::string>::iterator i = command.begin();
-        i != command.end(); ++i)
-      {
-      std::cout << *i << " ";
-      }
-    std::cout << "\n";
+    std::cout << cmJoin(command, " ") << "\n";
     }
   std::string output;
   int retCode =0;
   // use rc command to create .res file
   cmSystemTools::RunSingleCommand(command,
-                                  &output,
+                                  &output, &output,
                                   &retCode, 0, cmSystemTools::OUTPUT_NONE);
   // always print the output of the command, unless
   // it is the dumb rc command banner, but if the command

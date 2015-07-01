@@ -14,6 +14,8 @@
 #include "cmGlobalGenerator.h"
 #include "cmLocalGenerator.h"
 #include "cmake.h"
+#include "cmState.h"
+#include "cmAlgorithms.h"
 
 // cmGetCMakePropertyCommand
 bool cmGetCMakePropertyCommand
@@ -30,8 +32,7 @@ bool cmGetCMakePropertyCommand
 
   if ( args[1] == "VARIABLES" )
     {
-    int cacheonly = 0;
-    std::vector<std::string> vars = this->Makefile->GetDefinitions(cacheonly);
+    std::vector<std::string> vars = this->Makefile->GetDefinitions();
     if (!vars.empty())
       {
       output = cmJoin(vars, ";");
@@ -39,19 +40,22 @@ bool cmGetCMakePropertyCommand
     }
   else if ( args[1] == "MACROS" )
     {
+    output.clear();
     this->Makefile->GetListOfMacros(output);
     }
   else if ( args[1] == "COMPONENTS" )
     {
     const std::set<std::string>* components
-      = this->Makefile->GetLocalGenerator()->GetGlobalGenerator()
-        ->GetInstallComponents();
+      = this->Makefile->GetGlobalGenerator()->GetInstallComponents();
     output = cmJoin(*components, ";");
     }
   else
     {
-    const char *prop =
-      this->Makefile->GetCMakeInstance()->GetProperty(args[1]);
+    const char *prop = 0;
+    if (!args[1].empty())
+      {
+      prop = this->Makefile->GetState()->GetGlobalProperty(args[1]);
+      }
     if (prop)
       {
       output = prop;

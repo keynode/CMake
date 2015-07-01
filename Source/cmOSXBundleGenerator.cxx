@@ -22,7 +22,7 @@ cmOSXBundleGenerator(cmGeneratorTarget* target,
                      const std::string& configName)
  : GT(target)
  , Makefile(target->Target->GetMakefile())
- , LocalGenerator(Makefile->GetLocalGenerator())
+ , LocalGenerator(target->GetLocalGenerator())
  , ConfigName(configName)
  , MacContentFolders(0)
 {
@@ -181,8 +181,9 @@ void cmOSXBundleGenerator::CreateCFBundle(const std::string& targetName,
   std::string plist = root + "/" +
     this->GT->Target->GetCFBundleDirectory(this->ConfigName, true);
   plist += "/Info.plist";
+  std::string name = cmSystemTools::GetFilenameName(targetName);
   this->LocalGenerator->GenerateAppleInfoPList(this->GT->Target,
-                                               targetName,
+                                               name,
                                                plist.c_str());
   this->Makefile->AddCMakeOutputFile(plist);
 }

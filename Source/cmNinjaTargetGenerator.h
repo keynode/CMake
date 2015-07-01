@@ -33,7 +33,7 @@ public:
   static cmNinjaTargetGenerator* New(cmGeneratorTarget* target);
 
   /// Build a NinjaTargetGenerator.
-  cmNinjaTargetGenerator(cmTarget* target);
+  cmNinjaTargetGenerator(cmGeneratorTarget* target);
 
   /// Destructor.
   virtual ~cmNinjaTargetGenerator();
@@ -67,8 +67,7 @@ protected:
 
   std::string const& GetConfigName() const;
 
-  std::string LanguageCompilerRule(const std::string& lang) const
-  { return lang + "_COMPILER"; }
+  std::string LanguageCompilerRule(const std::string& lang) const;
 
   const char* GetFeature(const std::string& feature);
   bool GetFeatureAsBool(const std::string& feature);

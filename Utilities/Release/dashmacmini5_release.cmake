@@ -8,13 +8,8 @@ set(MAKE "${MAKE_PROGRAM} -j5")
 set(CPACK_BINARY_GENERATORS "DragNDrop TGZ TZ")
 set(CPACK_SOURCE_GENERATORS "TGZ TZ")
 set(CPACK_DMG_FORMAT "UDBZ") #build using bzip2 for smaller package size
-if(CMAKE_CREATE_VERSION STREQUAL "nightly")
-  set(CMAKE_USE_OPENSSL OFF)
-else()
-  set(CMAKE_USE_OPENSSL ON)
-endif()
 set(INITIAL_CACHE "
-CMAKE_USE_OPENSSL:BOOL=${CMAKE_USE_OPENSSL}
+CMAKE_USE_OPENSSL:BOOL=OFF
 OPENSSL_CRYPTO_LIBRARY:FILEPATH=/Users/kitware/openssl-1.0.1g-install/lib/libcrypto.a
 OPENSSL_INCLUDE_DIR:PATH=/Users/kitware/openssl-1.0.1g-install/include
 OPENSSL_SSL_LIBRARY:FILEPATH=/Users/kitware/openssl-1.0.1g-install/lib/libssl.a
@@ -25,7 +20,7 @@ CMAKE_SKIP_BOOTSTRAP_TEST:STRING=TRUE
 CPACK_SYSTEM_NAME:STRING=Darwin-x86_64
 BUILD_QtDialog:BOOL=TRUE
 CMake_GUI_DISTRIBUTE_WITH_Qt_LGPL:BOOL=TRUE
-QT_QMAKE_EXECUTABLE:FILEPATH=/Users/kitware/Support/qt-4.8.0/install/bin/qmake
+QT_QMAKE_EXECUTABLE:FILEPATH=/Users/kitware/Support/qt-4.8.6/install/bin/qmake
 ")
 get_filename_component(path "${CMAKE_CURRENT_LIST_FILE}" PATH)
 include(${path}/release_cmake.cmake)

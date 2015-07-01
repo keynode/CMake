@@ -223,7 +223,9 @@ public:
      OUTPUT_NORMAL,
      OUTPUT_PASSTHROUGH
    };
-  static bool RunSingleCommand(const char* command, std::string* output = 0,
+  static bool RunSingleCommand(const char* command,
+                               std::string* captureStdOut = 0,
+                               std::string* captureStdErr = 0,
                                int* retVal = 0, const char* dir = 0,
                                OutputOption outputflag = OUTPUT_MERGE,
                                double timeout = 0.0);
@@ -233,7 +235,8 @@ public:
    * be in comand[1]...command[command.size()]
    */
   static bool RunSingleCommand(std::vector<std::string> const& command,
-                               std::string* output = 0,
+                               std::string* captureStdOut = 0,
+                               std::string* captureStdErr = 0,
                                int* retVal = 0, const char* dir = 0,
                                OutputOption outputflag = OUTPUT_MERGE,
                                double timeout = 0.0);
@@ -395,7 +398,8 @@ public:
   static bool CreateTar(const char* outFileName,
                         const std::vector<std::string>& files,
                         cmTarCompression compressType, bool verbose,
-                        std::string const& mtime = std::string());
+                        std::string const& mtime = std::string(),
+                        std::string const& format = std::string());
   static bool ExtractTar(const char* inFileName, bool verbose);
   // This should be called first thing in main
   // it will keep child processes from inheriting the

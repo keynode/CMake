@@ -159,6 +159,8 @@ set(SRCS
   cmCacheManager.cxx
   cmCacheManager.h
   "${CMAKE_CURRENT_BINARY_DIR}/cmCommands.cxx"
+  cmCLocaleEnvironmentScope.h
+  cmCLocaleEnvironmentScope.cxx
   cmCommands.h
   cmCommandArgumentLexer.cxx
   cmCommandArgumentParser.cxx
@@ -219,6 +221,8 @@ set(SRCS
   cmExportSet.cxx
   cmExportSetMap.h
   cmExportSetMap.cxx
+  cmExternalMakefileProjectGenerator.cxx
+  cmExternalMakefileProjectGenerator.h
   cmExtraCodeBlocksGenerator.cxx
   cmExtraCodeBlocksGenerator.h
   cmExtraCodeLiteGenerator.cxx
@@ -238,12 +242,18 @@ set(SRCS
   cmFileTimeComparison.cxx
   cmFileTimeComparison.h
   cmGeneratedFileStream.cxx
+  cmGeneratorExpressionContext.cxx
+  cmGeneratorExpressionContext.h
   cmGeneratorExpressionDAGChecker.cxx
   cmGeneratorExpressionDAGChecker.h
+  cmGeneratorExpressionEvaluationFile.cxx
+  cmGeneratorExpressionEvaluationFile.h
   cmGeneratorExpressionEvaluator.cxx
   cmGeneratorExpressionEvaluator.h
   cmGeneratorExpressionLexer.cxx
   cmGeneratorExpressionLexer.h
+  cmGeneratorExpressionNode.cxx
+  cmGeneratorExpressionNode.h
   cmGeneratorExpressionParser.cxx
   cmGeneratorExpressionParser.h
   cmGeneratorExpression.cxx
@@ -271,6 +281,7 @@ set(SRCS
   cmInstallTargetGenerator.cxx
   cmInstallDirectoryGenerator.h
   cmInstallDirectoryGenerator.cxx
+  cmLinkedTree.h
   cmListFileCache.cxx
   cmListFileCache.h
   cmListFileLexer.c
@@ -289,6 +300,8 @@ set(SRCS
   cmMakefileUtilityTargetGenerator.cxx
   cmOSXBundleGenerator.cxx
   cmOSXBundleGenerator.h
+  cmOutputConverter.cxx
+  cmOutputConverter.h
   cmNewLineStyle.h
   cmNewLineStyle.cxx
   cmOrderDirectories.cxx
@@ -317,6 +330,8 @@ set(SRCS
   cmSourceFileLocation.h
   cmSourceGroup.cxx
   cmSourceGroup.h
+  cmState.cxx
+  cmState.h
   cmSystemTools.cxx
   cmSystemTools.h
   cmTarget.cxx
@@ -335,6 +350,8 @@ set(SRCS
   cmXMLParser.h
   cmXMLSafe.cxx
   cmXMLSafe.h
+  cmXMLWriter.cxx
+  cmXMLWriter.h
   cmake.cxx
   cmake.h
 
@@ -470,6 +487,14 @@ if (WIN32)
       cmVisualStudioSlnParser.cxx
       cmVisualStudioWCEPlatformParser.h
       cmVisualStudioWCEPlatformParser.cxx
+      cmGlobalGhsMultiGenerator.cxx
+      cmGlobalGhsMultiGenerator.h
+      cmLocalGhsMultiGenerator.cxx
+      cmLocalGhsMultiGenerator.h
+      cmGhsMultiTargetGenerator.cxx
+      cmGhsMultiTargetGenerator.h
+      cmGhsMultiGpj.cxx
+      cmGhsMultiGpj.h
       )
   endif()
 endif ()
@@ -497,6 +522,7 @@ set(SRCS ${SRCS}
   cmNinjaUtilityTargetGenerator.cxx
   cmNinjaUtilityTargetGenerator.h
   )
+
 if(WIN32 AND NOT CYGWIN)
   set_source_files_properties(cmcldeps.cxx PROPERTIES COMPILE_DEFINITIONS _WIN32_WINNT=0x0501)
   add_executable(cmcldeps cmcldeps.cxx)
@@ -524,8 +550,8 @@ if(APPLE)
   target_link_libraries(CMakeLib "-framework CoreFoundation")
 endif()
 
-# On some platforms we need the rpcrt4 library for the VS 7 generators.
 if(CMAKE_BUILD_ON_VISUAL_STUDIO OR MINGW)
+  # We need the rpcrt4 library for at least the VS7-VC10 generators.
   target_link_libraries(CMakeLib rpcrt4)
 endif()
 
@@ -642,14 +668,25 @@ endif()
 if(WIN32)
   set(CPACK_SRCS ${CPACK_SRCS}
     CPack/WiX/cmCPackWIXGenerator.cxx
+    CPack/WiX/cmCPackWIXGenerator.h
     CPack/WiX/cmWIXAccessControlList.cxx
+    CPack/WiX/cmWIXAccessControlList.h
     CPack/WiX/cmWIXDirectoriesSourceWriter.cxx
+    CPack/WiX/cmWIXDirectoriesSourceWriter.h
     CPack/WiX/cmWIXFeaturesSourceWriter.cxx
+    CPack/WiX/cmWIXFeaturesSourceWriter.h
     CPack/WiX/cmWIXFilesSourceWriter.cxx
+    CPack/WiX/cmWIXFilesSourceWriter.h
     CPack/WiX/cmWIXPatch.cxx
+    CPack/WiX/cmWIXPatch.h
     CPack/WiX/cmWIXPatchParser.cxx
+    CPack/WiX/cmWIXPatchParser.h
     CPack/WiX/cmWIXRichTextFormatWriter.cxx
+    CPack/WiX/cmWIXRichTextFormatWriter.h
+    CPack/WiX/cmWIXShortcut.cxx
+    CPack/WiX/cmWIXShortcut.h
     CPack/WiX/cmWIXSourceWriter.cxx
+    CPack/WiX/cmWIXSourceWriter.h
   )
 endif()
 

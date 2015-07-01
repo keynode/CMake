@@ -98,6 +98,10 @@ else()
   # Each entry in this list is a set of extra flags to try
   # adding to the compile line to see if it helps produce
   # a valid identification executable.
+  set(CMAKE_Fortran_COMPILER_ID_TEST_FLAGS_FIRST
+    # Get verbose output to help distinguish compilers.
+    "-v"
+    )
   set(CMAKE_Fortran_COMPILER_ID_TEST_FLAGS
     # Try compiling to an object file only.
     "-c"
@@ -111,6 +115,10 @@ endif()
 if(NOT CMAKE_Fortran_COMPILER_ID_RUN)
   set(CMAKE_Fortran_COMPILER_ID_RUN 1)
 
+  # Table of per-vendor compiler output regular expressions.
+  list(APPEND CMAKE_Fortran_COMPILER_ID_MATCH_VENDORS CCur)
+  set(CMAKE_Fortran_COMPILER_ID_MATCH_VENDOR_REGEX_CCur "Concurrent Fortran [0-9]+ Compiler")
+
   # Table of per-vendor compiler id flags with expected output.
   list(APPEND CMAKE_Fortran_COMPILER_ID_VENDORS Compaq)
   set(CMAKE_Fortran_COMPILER_ID_VENDOR_FLAGS_Compaq "-what")
@@ -118,6 +126,47 @@ if(NOT CMAKE_Fortran_COMPILER_ID_RUN)
   list(APPEND CMAKE_Fortran_COMPILER_ID_VENDORS NAG) # Numerical Algorithms Group
   set(CMAKE_Fortran_COMPILER_ID_VENDOR_FLAGS_NAG "-V")
   set(CMAKE_Fortran_COMPILER_ID_VENDOR_REGEX_NAG "NAG Fortran Compiler")
+
+  set(_version_info "")
+  foreach(m MAJOR MINOR PATCH TWEAK)
+    set(_COMP "_${m}")
+    set(_version_info "${_version_info}
+#if defined(COMPILER_VERSION${_COMP})")
+    foreach(d 1 2 3 4 5 6 7 8)
+      set(_version_info "${_version_info}
+# undef DEC
+# undef HEX
+# define DEC(n) DEC_${d}(n)
+# define HEX(n) HEX_${d}(n)
+# if COMPILER_VERSION${_COMP} == 0
+        PRINT *, 'INFO:compiler_version${_COMP}_digit_${d}[0]'
+# elif COMPILER_VERSION${_COMP} == 1
+        PRINT *, 'INFO:compiler_version${_COMP}_digit_${d}[1]'
+# elif COMPILER_VERSION${_COMP} == 2
+        PRINT *, 'INFO:compiler_version${_COMP}_digit_${d}[2]'
+# elif COMPILER_VERSION${_COMP} == 3
+        PRINT *, 'INFO:compiler_version${_COMP}_digit_${d}[3]'
+# elif COMPILER_VERSION${_COMP} == 4
+        PRINT *, 'INFO:compiler_version${_COMP}_digit_${d}[4]'
+# elif COMPILER_VERSION${_COMP} == 5
+        PRINT *, 'INFO:compiler_version${_COMP}_digit_${d}[5]'
+# elif COMPILER_VERSION${_COMP} == 6
+        PRINT *, 'INFO:compiler_version${_COMP}_digit_${d}[6]'
+# elif COMPILER_VERSION${_COMP} == 7
+        PRINT *, 'INFO:compiler_version${_COMP}_digit_${d}[7]'
+# elif COMPILER_VERSION${_COMP} == 8
+        PRINT *, 'INFO:compiler_version${_COMP}_digit_${d}[8]'
+# elif COMPILER_VERSION${_COMP} == 9
+        PRINT *, 'INFO:compiler_version${_COMP}_digit_${d}[9]'
+# endif
+")
+    endforeach()
+    set(_version_info "${_version_info}
+#endif")
+  endforeach()
+  set(CMAKE_Fortran_COMPILER_ID_VERSION_INFO "${_version_info}")
+  unset(_version_info)
+  unset(_COMP)
 
   # Try to identify the compiler.
   set(CMAKE_Fortran_COMPILER_ID)

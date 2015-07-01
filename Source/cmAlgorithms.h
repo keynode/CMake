@@ -81,6 +81,16 @@ private:
   const std::string m_test;
 };
 
+template<typename FwdIt>
+FwdIt cmRotate(FwdIt first, FwdIt middle, FwdIt last)
+{
+  const typename std::iterator_traits<FwdIt>::difference_type dist =
+      std::distance(middle, last);
+  std::rotate(first, middle, last);
+  std::advance(first, dist);
+  return first;
+}
+
 namespace ContainerAlgorithms {
 
 template<typename T>
@@ -95,19 +105,19 @@ struct cmIsPair<std::pair<K, V> >
   enum { value = true };
 };
 
-template<typename Container,
-    bool valueTypeIsPair = cmIsPair<typename Container::value_type>::value>
+template<typename Range,
+    bool valueTypeIsPair = cmIsPair<typename Range::value_type>::value>
 struct DefaultDeleter
 {
-  void operator()(typename Container::value_type value) {
+  void operator()(typename Range::value_type value) const {
     delete value;
   }
 };
 
-template<typename Container>
-struct DefaultDeleter<Container, /* valueTypeIsPair = */ true>
+template<typename Range>
+struct DefaultDeleter<Range, /* valueTypeIsPair = */ true>
 {
-  void operator()(typename Container::value_type value) {
+  void operator()(typename Range::value_type value) const {
     delete value.second;
   }
 };
@@ -117,11 +127,14 @@ struct Range
 {
   typedef const_iterator_ const_iterator;
   typedef typename std::iterator_traits<const_iterator>::value_type value_type;
+  typedef typename std::iterator_traits<const_iterator>::difference_type
+    difference_type;
   Range(const_iterator begin_, const_iterator end_)
     : Begin(begin_), End(end_) {}
   const_iterator begin() const { return Begin; }
   const_iterator end() const { return End; }
   bool empty() const { return std::distance(Begin, End) == 0; }
+  difference_type size() const { return std::distance(Begin, End); }
   Range& advance(cmIML_INT_intptr_t amount)
   {
     std::advance(Begin, amount);
@@ -138,20 +151,12 @@ private:
   const_iterator End;
 };
 
-template<typename BiDirIt>
-BiDirIt Rotate(BiDirIt first, BiDirIt middle, BiDirIt last)
+template<typename FwdIt>
+FwdIt RemoveN(FwdIt i1, FwdIt i2, size_t n)
 {
-  typename std::iterator_traits<BiDirIt>::difference_type dist =
-      std::distance(first, middle);
-  std::rotate(first, middle, last);
-  std::advance(last, -dist);
-  return last;
-}
-
-template<typename Iter>
-Iter RemoveN(Iter i1, Iter i2, size_t n)
-{
-  return ContainerAlgorithms::Rotate(i1, i1 + n, i2);
+  FwdIt m = i1;
+  std::advance(m, n);
+  return cmRotate(i1, m, i2);
 }
 
 template<typename Range>
@@ -163,7 +168,7 @@ struct BinarySearcher
   {
   }
 
-  bool operator()(argument_type const& item)
+  bool operator()(argument_type const& item) const
   {
     return std::binary_search(m_range.begin(), m_range.end(), item);
   }
@@ -187,11 +192,11 @@ cmRange(Range const& range)
       range.begin(), range.end());
 }
 
-template<typename Container>
-void cmDeleteAll(Container const& c)
+template<typename Range>
+void cmDeleteAll(Range const& r)
 {
-  std::for_each(c.begin(), c.end(),
-                ContainerAlgorithms::DefaultDeleter<Container>());
+  std::for_each(r.begin(), r.end(),
+                ContainerAlgorithms::DefaultDeleter<Range>());
 }
 
 template<typename Range>
@@ -204,7 +209,7 @@ std::string cmJoin(Range const& r, const char* delimiter)
   std::ostringstream os;
   typedef typename Range::value_type ValueType;
   typedef typename Range::const_iterator InputIt;
-  InputIt first = r.begin();
+  const InputIt first = r.begin();
   InputIt last = r.end();
   --last;
   std::copy(first, last,
@@ -231,16 +236,26 @@ template<typename Range, typename InputRange>
 typename Range::const_iterator cmRemoveIndices(Range& r, InputRange const& rem)
 {
   typename InputRange::const_iterator remIt = rem.begin();
+  typename InputRange::const_iterator remEnd = rem.end();
+  const typename Range::iterator rangeEnd = r.end();
+  if (remIt == remEnd)
+    {
+    return rangeEnd;
+    }
 
-  typename Range::iterator writer = r.begin() + *remIt;
+  typename Range::iterator writer = r.begin();
+  std::advance(writer, *remIt);
+  typename Range::iterator pivot = writer;
+  typename InputRange::value_type prevRem = *remIt;
   ++remIt;
   size_t count = 1;
-  for ( ; writer != r.end() && remIt != rem.end(); ++count, ++remIt)
+  for ( ; writer != rangeEnd && remIt != remEnd; ++count, ++remIt)
     {
-    writer = ContainerAlgorithms::RemoveN(writer, r.begin() + *remIt, count);
+    std::advance(pivot, *remIt - prevRem);
+    prevRem = *remIt;
+    writer = ContainerAlgorithms::RemoveN(writer, pivot, count);
     }
-  writer = ContainerAlgorithms::RemoveN(writer, r.end(), count);
-  return writer;
+  return ContainerAlgorithms::RemoveN(writer, rangeEnd, count);
 }
 
 template<typename Range, typename MatchRange>
@@ -250,21 +265,53 @@ typename Range::const_iterator cmRemoveMatching(Range &r, MatchRange const& m)
                         ContainerAlgorithms::BinarySearcher<MatchRange>(m));
 }
 
+namespace ContainerAlgorithms {
+
+template<typename Range, typename T = typename Range::value_type>
+struct RemoveDuplicatesAPI
+{
+  typedef typename Range::const_iterator const_iterator;
+  typedef typename Range::const_iterator value_type;
+
+  static bool lessThan(value_type a, value_type b) { return *a < *b; }
+  static value_type uniqueValue(const_iterator a) { return a; }
+  template<typename It>
+  static bool valueCompare(It it, const_iterator it2) { return **it != *it2; }
+};
+
+template<typename Range, typename T>
+struct RemoveDuplicatesAPI<Range, T*>
+{
+  typedef typename Range::const_iterator const_iterator;
+  typedef T* value_type;
+
+  static bool lessThan(value_type a, value_type b) { return a < b; }
+  static value_type uniqueValue(const_iterator a) { return *a; }
+  template<typename It>
+  static bool valueCompare(It it, const_iterator it2) { return *it != *it2; }
+};
+
+}
+
 template<typename Range>
 typename Range::const_iterator cmRemoveDuplicates(Range& r)
 {
-  std::vector<typename Range::value_type> unique;
+  typedef typename ContainerAlgorithms::RemoveDuplicatesAPI<Range> API;
+  typedef typename API::value_type T;
+  std::vector<T> unique;
   unique.reserve(r.size());
   std::vector<size_t> indices;
   size_t count = 0;
+  const typename Range::const_iterator end = r.end();
   for(typename Range::const_iterator it = r.begin();
-      it != r.end(); ++it, ++count)
+      it != end; ++it, ++count)
     {
-    typename Range::iterator low =
-        std::lower_bound(unique.begin(), unique.end(), *it);
-    if (low == unique.end() || *low != *it)
+    const typename std::vector<T>::iterator low =
+        std::lower_bound(unique.begin(), unique.end(),
+                         API::uniqueValue(it), API::lessThan);
+    if (low == unique.end() || API::valueCompare(low, it))
       {
-      unique.insert(low, *it);
+      unique.insert(low, API::uniqueValue(it));
       }
     else
       {
@@ -273,10 +320,41 @@ typename Range::const_iterator cmRemoveDuplicates(Range& r)
     }
   if (indices.empty())
     {
-    return r.end();
+    return end;
     }
-  std::sort(indices.begin(), indices.end());
   return cmRemoveIndices(r, indices);
+}
+
+template<typename Range>
+std::string cmWrap(std::string prefix, Range const& r, std::string suffix,
+                   std::string sep)
+{
+  if (r.empty())
+    {
+    return std::string();
+    }
+  return prefix + cmJoin(r, (suffix + sep + prefix).c_str()) + suffix;
+}
+
+template<typename Range>
+std::string cmWrap(char prefix, Range const& r, char suffix, std::string sep)
+{
+  return cmWrap(std::string(1, prefix), r, std::string(1, suffix), sep);
+}
+
+template<typename Range, typename T>
+typename Range::const_iterator cmFindNot(Range const& r, T const& t)
+{
+  return std::find_if(r.begin(), r.end(),
+                      std::bind1st(std::not_equal_to<T>(), t));
+}
+
+template<typename Range>
+ContainerAlgorithms::Range<typename Range::const_reverse_iterator>
+cmReverseRange(Range const& range)
+{
+  return ContainerAlgorithms::Range<typename Range::const_reverse_iterator>(
+      range.rbegin(), range.rend());
 }
 
 #endif

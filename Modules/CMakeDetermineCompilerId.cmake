@@ -34,12 +34,19 @@ function(CMAKE_DETERMINE_COMPILER_ID lang flagvar src)
 
   # Try building with no extra flags and then try each set
   # of helper flags.  Stop when the compiler is identified.
-  foreach(flags "" ${CMAKE_${lang}_COMPILER_ID_TEST_FLAGS})
-    if(NOT CMAKE_${lang}_COMPILER_ID)
-      CMAKE_DETERMINE_COMPILER_ID_BUILD("${lang}" "${flags}" "${src}")
-      foreach(file ${COMPILER_${lang}_PRODUCED_FILES})
-        CMAKE_DETERMINE_COMPILER_ID_CHECK("${lang}" "${CMAKE_${lang}_COMPILER_ID_DIR}/${file}" "${src}")
-      endforeach()
+  foreach(flags ${CMAKE_${lang}_COMPILER_ID_TEST_FLAGS_FIRST}
+                ""
+                ${CMAKE_${lang}_COMPILER_ID_TEST_FLAGS})
+    CMAKE_DETERMINE_COMPILER_ID_BUILD("${lang}" "${flags}" "${src}")
+    CMAKE_DETERMINE_COMPILER_ID_MATCH_VENDOR("${lang}" "${COMPILER_${lang}_PRODUCED_OUTPUT}")
+    if(CMAKE_${lang}_COMPILER_ID)
+      break()
+    endif()
+    foreach(file ${COMPILER_${lang}_PRODUCED_FILES})
+      CMAKE_DETERMINE_COMPILER_ID_CHECK("${lang}" "${CMAKE_${lang}_COMPILER_ID_DIR}/${file}" "${src}")
+    endforeach()
+    if(CMAKE_${lang}_COMPILER_ID)
+      break()
     endif()
   endforeach()
 
@@ -210,7 +217,7 @@ Id flags: ${testflags}
       set(id_subsystem 1)
     endif()
     set(id_dir ${CMAKE_${lang}_COMPILER_ID_DIR})
-    get_filename_component(id_src "${src}" NAME)
+    set(id_src "${src}")
     configure_file(${CMAKE_ROOT}/Modules/CompilerId/VS-${v}.${ext}.in
       ${id_dir}/CompilerId${lang}.${ext} @ONLY)
     if(CMAKE_VS_MSBUILD_COMMAND AND NOT lang STREQUAL "Fortran")
@@ -249,7 +256,7 @@ Id flags: ${testflags}
     set(id_lang "${lang}")
     set(id_type ${CMAKE_${lang}_COMPILER_XCODE_TYPE})
     set(id_dir ${CMAKE_${lang}_COMPILER_ID_DIR})
-    get_filename_component(id_src "${src}" NAME)
+    set(id_src "${src}")
     if(CMAKE_XCODE_PLATFORM_TOOLSET)
       set(id_toolset "GCC_VERSION = ${CMAKE_XCODE_PLATFORM_TOOLSET};")
     else()
@@ -355,6 +362,7 @@ ${CMAKE_${lang}_COMPILER_ID_OUTPUT}
 
     # No output files should be inspected.
     set(COMPILER_${lang}_PRODUCED_FILES)
+    set(COMPILER_${lang}_PRODUCED_OUTPUT)
   else()
     # Compilation succeeded.
     file(APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeOutput.log
@@ -395,10 +403,24 @@ ${CMAKE_${lang}_COMPILER_ID_OUTPUT}
         "${src}\" did not produce an executable in \""
         "${CMAKE_${lang}_COMPILER_ID_DIR}\".\n\n")
     endif()
+
+    set(COMPILER_${lang}_PRODUCED_OUTPUT "${CMAKE_${lang}_COMPILER_ID_OUTPUT}")
   endif()
 
   # Return the files produced by the compilation.
   set(COMPILER_${lang}_PRODUCED_FILES "${COMPILER_${lang}_PRODUCED_FILES}" PARENT_SCOPE)
+  set(COMPILER_${lang}_PRODUCED_OUTPUT "${COMPILER_${lang}_PRODUCED_OUTPUT}" PARENT_SCOPE)
+endfunction()
+
+#-----------------------------------------------------------------------------
+# Function to extract the compiler id from compiler output.
+function(CMAKE_DETERMINE_COMPILER_ID_MATCH_VENDOR lang output)
+  foreach(vendor ${CMAKE_${lang}_COMPILER_ID_MATCH_VENDORS})
+    if(output MATCHES "${CMAKE_${lang}_COMPILER_ID_MATCH_VENDOR_REGEX_${vendor}}")
+      set(CMAKE_${lang}_COMPILER_ID "${vendor}")
+    endif()
+  endforeach()
+  set(CMAKE_${lang}_COMPILER_ID "${CMAKE_${lang}_COMPILER_ID}" PARENT_SCOPE)
 endfunction()
 
 #-----------------------------------------------------------------------------
@@ -409,12 +431,28 @@ function(CMAKE_DETERMINE_COMPILER_ID_CHECK lang file)
     # Read the compiler identification string from the executable file.
     set(COMPILER_ID)
     set(COMPILER_VERSION)
+    set(COMPILER_VERSION_MAJOR 0)
+    set(COMPILER_VERSION_MINOR 0)
+    set(COMPILER_VERSION_PATCH 0)
+    set(COMPILER_VERSION_TWEAK 0)
+    set(HAVE_COMPILER_VERSION_MAJOR 0)
+    set(HAVE_COMPILER_VERSION_MINOR 0)
+    set(HAVE_COMPILER_VERSION_PATCH 0)
+    set(HAVE_COMPILER_VERSION_TWEAK 0)
+    set(DIGIT_VALUE_1 1)
+    set(DIGIT_VALUE_2 10)
+    set(DIGIT_VALUE_3 100)
+    set(DIGIT_VALUE_4 1000)
+    set(DIGIT_VALUE_5 10000)
+    set(DIGIT_VALUE_6 100000)
+    set(DIGIT_VALUE_7 1000000)
+    set(DIGIT_VALUE_8 10000000)
     set(PLATFORM_ID)
     set(ARCHITECTURE_ID)
     set(SIMULATE_ID)
     set(SIMULATE_VERSION)
     file(STRINGS ${file}
-      CMAKE_${lang}_COMPILER_ID_STRINGS LIMIT_COUNT 6 REGEX "INFO:[A-Za-z0-9_]+\\[[^]]*\\]")
+      CMAKE_${lang}_COMPILER_ID_STRINGS LIMIT_COUNT 38 REGEX "INFO:[A-Za-z0-9_]+\\[[^]]*\\]")
     set(COMPILER_ID_TWICE)
     foreach(info ${CMAKE_${lang}_COMPILER_ID_STRINGS})
       if("${info}" MATCHES "INFO:compiler\\[([^]\"]*)\\]")
@@ -433,6 +471,15 @@ function(CMAKE_DETERMINE_COMPILER_ID_CHECK lang file)
         string(REGEX REPLACE "^0+([0-9])" "\\1" COMPILER_VERSION "${CMAKE_MATCH_1}")
         string(REGEX REPLACE "\\.0+([0-9])" ".\\1" COMPILER_VERSION "${COMPILER_VERSION}")
       endif()
+      foreach(comp MAJOR MINOR PATCH TWEAK)
+        foreach(digit 1 2 3 4 5 6 7 8 9)
+          if("${info}" MATCHES "INFO:compiler_version_${comp}_digit_${digit}\\[([0-9])\\]")
+            set(value ${CMAKE_MATCH_1})
+            math(EXPR COMPILER_VERSION_${comp} "${COMPILER_VERSION_${comp}} + ${value} * ${DIGIT_VALUE_${digit}}")
+            set(HAVE_COMPILER_VERSION_${comp} 1)
+          endif()
+        endforeach()
+      endforeach()
       if("${info}" MATCHES "INFO:simulate\\[([^]\"]*)\\]")
         set(SIMULATE_ID "${CMAKE_MATCH_1}")
       endif()
@@ -444,6 +491,20 @@ function(CMAKE_DETERMINE_COMPILER_ID_CHECK lang file)
         set(COMPILER_QNXNTO 1)
       endif()
     endforeach()
+
+    # Construct compiler version from components if needed.
+    if(NOT DEFINED COMPILER_VERSION AND HAVE_COMPILER_VERSION_MAJOR)
+      set(COMPILER_VERSION "${COMPILER_VERSION_MAJOR}")
+      if(HAVE_COMPILER_VERSION_MINOR)
+        set(COMPILER_VERSION "${COMPILER_VERSION}.${COMPILER_VERSION_MINOR}")
+        if(HAVE_COMPILER_VERSION_PATCH)
+          set(COMPILER_VERSION "${COMPILER_VERSION}.${COMPILER_VERSION_PATCH}")
+          if(HAVE_COMPILER_VERSION_TWEAK)
+            set(COMPILER_VERSION "${COMPILER_VERSION}.${COMPILER_VERSION_TWEAK}")
+          endif()
+        endif()
+      endif()
+    endif()
 
     # Detect the exact architecture from the PE header.
     if(WIN32)
@@ -469,8 +530,6 @@ function(CMAKE_DETERMINE_COMPILER_ID_CHECK lang file)
         set(ARCHITECTURE_ID "SH4")
       elseif(peheader STREQUAL "50450000a801")
         set(ARCHITECTURE_ID "SH5")
-      elseif(peheader STREQUAL "50450000c201")
-        set(ARCHITECTURE_ID "THUMB")
       endif()
     endif()
 

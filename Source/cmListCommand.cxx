@@ -12,6 +12,7 @@
 #include "cmListCommand.h"
 #include <cmsys/RegularExpression.hxx>
 #include <cmsys/SystemTools.hxx>
+#include "cmAlgorithms.h"
 
 #include <stdlib.h> // required for atoi
 #include <ctype.h>
@@ -120,8 +121,7 @@ bool cmListCommand::GetList(std::vector<std::string>& list,
       // empty values
       list.clear();
       cmSystemTools::ExpandListArgument(listString, list);
-      std::string warn = this->Makefile->GetPolicies()->
-        GetPolicyWarning(cmPolicies::CMP0007);
+      std::string warn = cmPolicies::GetPolicyWarning(cmPolicies::CMP0007);
       warn += " List has value = [";
       warn += listString;
       warn += "].";
@@ -142,8 +142,7 @@ bool cmListCommand::GetList(std::vector<std::string>& list,
     case cmPolicies::REQUIRED_ALWAYS:
       this->Makefile->IssueMessage(
         cmake::FATAL_ERROR,
-        this->Makefile->GetPolicies()
-        ->GetRequiredPolicyError(cmPolicies::CMP0007)
+        cmPolicies::GetRequiredPolicyError(cmPolicies::CMP0007)
         );
       return false;
     }
@@ -202,12 +201,12 @@ bool cmListCommand::HandleGetCommand(std::vector<std::string> const& args)
   std::string value;
   size_t cc;
   const char* sep = "";
+  size_t nitem = varArgsExpanded.size();
   for ( cc = 2; cc < args.size()-1; cc ++ )
     {
     int item = atoi(args[cc].c_str());
     value += sep;
     sep = ";";
-    size_t nitem = varArgsExpanded.size();
     if ( item < 0 )
       {
       item = (int)nitem + item;
@@ -216,8 +215,8 @@ bool cmListCommand::HandleGetCommand(std::vector<std::string> const& args)
       {
       std::ostringstream str;
       str << "index: " << item << " out of range (-"
-          << varArgsExpanded.size() << ", "
-          << varArgsExpanded.size()-1 << ")";
+          << nitem << ", "
+          << nitem - 1 << ")";
       this->SetError(str.str());
       return false;
       }
@@ -390,8 +389,7 @@ bool cmListCommand
     return false;
     }
 
-  std::reverse(varArgsExpanded.begin(), varArgsExpanded.end());
-  std::string value = cmJoin(varArgsExpanded, ";");
+  std::string value = cmJoin(cmReverseRange(varArgsExpanded), ";");
 
   this->Makefile->AddDefinition(listName, value.c_str());
   return true;
@@ -485,10 +483,10 @@ bool cmListCommand::HandleRemoveAtCommand(
 
   size_t cc;
   std::vector<size_t> removed;
+  size_t nitem = varArgsExpanded.size();
   for ( cc = 2; cc < args.size(); ++ cc )
     {
     int item = atoi(args[cc].c_str());
-    size_t nitem = varArgsExpanded.size();
     if ( item < 0 )
       {
       item = (int)nitem + item;
@@ -497,8 +495,8 @@ bool cmListCommand::HandleRemoveAtCommand(
       {
       std::ostringstream str;
       str << "index: " << item << " out of range (-"
-          << varArgsExpanded.size() << ", "
-          << varArgsExpanded.size()-1 << ")";
+          << nitem << ", "
+          << nitem - 1 << ")";
       this->SetError(str.str());
       return false;
       }

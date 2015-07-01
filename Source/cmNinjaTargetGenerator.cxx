@@ -22,6 +22,7 @@
 #include "cmComputeLinkInformation.h"
 #include "cmSourceFile.h"
 #include "cmCustomCommandGenerator.h"
+#include "cmAlgorithms.h"
 
 #include <algorithm>
 
@@ -45,7 +46,8 @@ cmNinjaTargetGenerator::New(cmGeneratorTarget* target)
         // (i.e. top-level) directory.  CMake creates copies of these targets
         // in every directory, which we don't need.
         cmMakefile *mf = target->Target->GetMakefile();
-        if (strcmp(mf->GetStartDirectory(), mf->GetHomeDirectory()) == 0)
+        if (strcmp(mf->GetCurrentSourceDirectory(),
+                   mf->GetHomeDirectory()) == 0)
           return new cmNinjaUtilityTargetGenerator(target);
         // else fallthrough
       }
@@ -55,19 +57,18 @@ cmNinjaTargetGenerator::New(cmGeneratorTarget* target)
     }
 }
 
-cmNinjaTargetGenerator::cmNinjaTargetGenerator(cmTarget* target)
+cmNinjaTargetGenerator::cmNinjaTargetGenerator(cmGeneratorTarget* target)
   :
     MacOSXContentGenerator(0),
     OSXBundleGenerator(0),
     MacContentFolders(),
-    Target(target),
-    Makefile(target->GetMakefile()),
+    Target(target->Target),
+    Makefile(target->Makefile),
     LocalGenerator(
-      static_cast<cmLocalNinjaGenerator*>(Makefile->GetLocalGenerator())),
+      static_cast<cmLocalNinjaGenerator*>(target->GetLocalGenerator())),
     Objects()
 {
-  this->GeneratorTarget =
-    this->GetGlobalGenerator()->GetGeneratorTarget(target);
+  this->GeneratorTarget = target;
   MacOSXContentGenerator = new MacOSXContentGeneratorType(this);
 }
 
@@ -96,16 +97,24 @@ std::string const& cmNinjaTargetGenerator::GetConfigName() const
   return this->LocalGenerator->GetConfigName();
 }
 
+std::string cmNinjaTargetGenerator::LanguageCompilerRule(
+  const std::string& lang) const
+{
+  return lang + "_COMPILER__" +
+    cmGlobalNinjaGenerator::EncodeRuleName(this->Target->GetName());
+}
+
 // TODO: Picked up from cmMakefileTargetGenerator.  Refactor it.
 const char* cmNinjaTargetGenerator::GetFeature(const std::string& feature)
 {
-  return this->Target->GetFeature(feature, this->GetConfigName());
+  return this->GeneratorTarget->GetFeature(feature, this->GetConfigName());
 }
 
 // TODO: Picked up from cmMakefileTargetGenerator.  Refactor it.
 bool cmNinjaTargetGenerator::GetFeatureAsBool(const std::string& feature)
 {
-  return this->Target->GetFeatureAsBool(feature, this->GetConfigName());
+  return this->GeneratorTarget->GetFeatureAsBool(feature,
+                                                 this->GetConfigName());
 }
 
 // TODO: Picked up from cmMakefileTargetGenerator.  Refactor it.
@@ -174,7 +183,7 @@ cmNinjaTargetGenerator::ComputeFlagsForObject(cmSourceFile const* source,
                                         // needed by cmcldeps
                                             false,
                                             this->GetConfigName());
-    if(cmGlobalNinjaGenerator::IsMinGW())
+    if (this->GetGlobalGenerator()->IsGCCOnWindows())
       cmSystemTools::ReplaceString(includeFlags, "\\", "/");
 
     this->LocalGenerator->AppendFlags(languageFlags, includeFlags);
@@ -231,7 +240,7 @@ ComputeDefines(cmSourceFile const* source, const std::string& language)
 
   // Add preprocessor definitions for this target and configuration.
   this->LocalGenerator->AddCompileDefinitions(defines, this->Target,
-                                             this->GetConfigName());
+                                             this->GetConfigName(), language);
   this->LocalGenerator->AppendDefines
     (defines,
      source->GetProperty("COMPILE_DEFINITIONS"));
@@ -449,6 +458,42 @@ cmNinjaTargetGenerator
   std::string compileCmd = mf->GetRequiredDefinition(cmdVar);
   std::vector<std::string> compileCmds;
   cmSystemTools::ExpandListArgument(compileCmd, compileCmds);
+
+  // Maybe insert an include-what-you-use runner.
+  if (!compileCmds.empty() && (lang == "C" || lang == "CXX"))
+    {
+    std::string const iwyu_prop = lang + "_INCLUDE_WHAT_YOU_USE";
+    const char *iwyu = this->Target->GetProperty(iwyu_prop);
+    if (iwyu && *iwyu)
+      {
+      std::string run_iwyu =
+        this->GetLocalGenerator()->ConvertToOutputFormat(
+          cmSystemTools::GetCMakeCommand(), cmLocalGenerator::SHELL);
+      run_iwyu += " -E __run_iwyu --iwyu=";
+      run_iwyu += this->GetLocalGenerator()->EscapeForShell(iwyu);
+      run_iwyu += " -- ";
+      compileCmds.front().insert(0, run_iwyu);
+      }
+    }
+
+  // Maybe insert a compiler launcher like ccache or distcc
+  if (!compileCmds.empty() && (lang == "C" || lang == "CXX"))
+    {
+    std::string const clauncher_prop = lang + "_COMPILER_LAUNCHER";
+    const char *clauncher = this->Target->GetProperty(clauncher_prop);
+    if (clauncher && *clauncher)
+      {
+      std::vector<std::string> launcher_cmd;
+      cmSystemTools::ExpandListArgument(clauncher, launcher_cmd, true);
+      for (std::vector<std::string>::iterator i = launcher_cmd.begin(),
+             e = launcher_cmd.end(); i != e; ++i)
+        {
+        *i = this->LocalGenerator->EscapeForShell(*i);
+        }
+      std::string const& run_launcher = cmJoin(launcher_cmd, " ") + " ";
+      compileCmds.front().insert(0, run_launcher);
+      }
+    }
 
   if (!compileCmds.empty())
     {

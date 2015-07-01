@@ -22,7 +22,7 @@
 //----------------------------------------------------------------------------
 cmMakefileLibraryTargetGenerator
 ::cmMakefileLibraryTargetGenerator(cmGeneratorTarget* target):
-  cmMakefileTargetGenerator(target->Target)
+  cmMakefileTargetGenerator(target)
 {
   this->CustomCommandDriver = OnDepends;
   if (this->Target->GetType() != cmTarget::INTERFACE_LIBRARY)
@@ -286,7 +286,7 @@ void cmMakefileLibraryTargetGenerator::WriteLibraryRules
     }
   else if(relink)
     {
-    outpath = this->Makefile->GetStartOutputDirectory();
+    outpath = this->Makefile->GetCurrentBinaryDirectory();
     outpath += cmake::GetCMakeFilesDirectory();
     outpath += "/CMakeRelink.dir";
     cmSystemTools::MakeDirectory(outpath.c_str());
@@ -445,7 +445,7 @@ void cmMakefileLibraryTargetGenerator::WriteLibraryRules
                                              *this->Target, "target");
     this->LocalGenerator->CreateCDCommand
       (commands1,
-       this->Makefile->GetStartOutputDirectory(),
+       this->Makefile->GetCurrentBinaryDirectory(),
        cmLocalGenerator::HOME_OUTPUT);
     commands.insert(commands.end(), commands1.begin(), commands1.end());
     commands1.clear();
@@ -626,7 +626,7 @@ void cmMakefileLibraryTargetGenerator::WriteLibraryRules
       install_name_dir =
         this->LocalGenerator->Convert(install_name_dir,
                                       cmLocalGenerator::NONE,
-                                      cmLocalGenerator::SHELL, false);
+                                      cmLocalGenerator::SHELL);
       vars.TargetInstallNameDir = install_name_dir.c_str();
       }
     }
@@ -726,7 +726,7 @@ void cmMakefileLibraryTargetGenerator::WriteLibraryRules
     }
   this->LocalGenerator->CreateCDCommand
     (commands1,
-     this->Makefile->GetStartOutputDirectory(),
+     this->Makefile->GetCurrentBinaryDirectory(),
      cmLocalGenerator::HOME_OUTPUT);
   commands.insert(commands.end(), commands1.begin(), commands1.end());
   commands1.clear();
@@ -743,7 +743,7 @@ void cmMakefileLibraryTargetGenerator::WriteLibraryRules
     symlink += targetOutPath;
     commands1.push_back(symlink);
     this->LocalGenerator->CreateCDCommand(commands1,
-                                  this->Makefile->GetStartOutputDirectory(),
+                                  this->Makefile->GetCurrentBinaryDirectory(),
                                   cmLocalGenerator::HOME_OUTPUT);
     commands.insert(commands.end(), commands1.begin(), commands1.end());
     commands1.clear();
@@ -769,9 +769,8 @@ void cmMakefileLibraryTargetGenerator::WriteLibraryRules
     }
 
   // Write the build rule.
-  this->LocalGenerator->WriteMakeRule(*this->BuildFileStream, 0,
-                                      outputs, depends, commands, false);
-
+  this->WriteMakeRule(*this->BuildFileStream, 0, outputs,
+                      depends, commands, false);
 
   // Write the main driver rule to build everything in this target.
   this->WriteTargetDriverRule(targetFullPath, relink);
